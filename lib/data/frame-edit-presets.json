@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "presets": [
+    {
+      "id": "teaser-fast-cuts",
+      "label": "Teaser — fast cuts",
+      "description": "Short hooks, 1–3s cuts, beat on downbeats; good for promo clips.",
+      "tags": ["teaser", "promo", "short-form"],
+      "hints": { "targetDurationSec": [15, 60], "cutStyle": "fast" }
+    },
+    {
+      "id": "ppv-pacing",
+      "label": "PPV pacing",
+      "description": "Slower reveal, chapter markers for paywall moments.",
+      "tags": ["ppv", "monetization"],
+      "hints": { "cutStyle": "slow", "chapters": true }
+    },
+    {
+      "id": "long-form-story",
+      "label": "Long-form story",
+      "description": "Narrative arc, intro → build → payoff; for extended edits.",
+      "tags": ["long-form", "story"],
+      "hints": { "cutStyle": "mixed", "acts": 3 }
+    }
+  ],
+  "tagTaxonomy": [
+    "teaser",
+    "ppv",
+    "long-form",
+    "promo",
+    "custom",
+    "fan-request",
+    "reshoot",
+    "b-roll"
+  ]
+}
