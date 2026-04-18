@@ -2,20 +2,26 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Studio shell — dark + purple accent (reference: Frame / Markit editor) */
 :root {
-  --background: oklch(0.08 0 0);
-  --foreground: oklch(0.95 0 0);
-  --card: oklch(0.12 0.005 285);
-  --card-foreground: oklch(0.95 0 0);
-  --muted: oklch(0.16 0.01 285);
-  --muted-foreground: oklch(0.6 0 0);
-  --border: oklch(0.22 0.015 285);
-  --primary: oklch(0.78 0.14 85);
-  --primary-foreground: oklch(0.12 0 0);
+  --background: oklch(0.12 0.02 280);
+  --foreground: oklch(0.96 0.01 280);
+  --card: oklch(0.16 0.025 280);
+  --card-foreground: oklch(0.96 0.01 280);
+  --muted: oklch(0.22 0.02 280);
+  --muted-foreground: oklch(0.62 0.02 280);
+  --border: oklch(0.28 0.03 280 / 0.55);
+  --studio-accent: oklch(0.58 0.24 290);
+  --studio-accent-hover: oklch(0.52 0.24 290);
+  --studio-accent-muted: oklch(0.58 0.24 290 / 0.25);
+  --primary: oklch(0.58 0.24 290);
+  --primary-foreground: oklch(0.98 0 0);
   --circe: oklch(0.55 0.2 295);
-  --circe-light: oklch(0.7 0.18 295);
+  --circe-light: oklch(0.72 0.16 295);
   --gold: oklch(0.78 0.14 85);
   --radius: 0.5rem;
+  --timeline-track: oklch(0.2 0.02 280);
+  --timeline-clip: oklch(0.45 0.12 290);
 }
 
 html {
@@ -32,13 +38,23 @@ body {
   font-family: var(--font-cinzel), ui-serif, Georgia, serif;
 }
 
+/* Legacy utility used on sign-in */
 .bg-gradient-frame {
   background:
-    radial-gradient(ellipse 80% 50% at 50% -20%, oklch(0.55 0.2 295 / 0.15), transparent),
-    radial-gradient(ellipse 60% 40% at 100% 0%, oklch(0.78 0.14 85 / 0.08), transparent);
+    radial-gradient(ellipse 80% 50% at 50% -20%, oklch(0.55 0.2 295 / 0.12), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 0%, oklch(0.58 0.24 290 / 0.08), transparent);
 }
 
 .border-gold-edge {
   border-bottom: 1px solid transparent;
-  border-image: linear-gradient(90deg, transparent, oklch(0.78 0.14 85 / 0.45), transparent) 1;
+  border-image: linear-gradient(90deg, transparent, oklch(0.78 0.14 85 / 0.35), transparent) 1;
+}
+
+.studio-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.studio-scrollbar::-webkit-scrollbar-thumb {
+  background: oklch(0.4 0.03 280 / 0.5);
+  border-radius: 3px;
 }
