@@ -3,6 +3,10 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { MarkitEditPlanV1 } from '@/lib/markit-edit-plan'
+import { planNeedsSecondarySource } from '@/lib/markit-edit-plan'
+import type { TimelineSegment } from '@/lib/timeline-project'
+import { TimelineClipsStrip } from '@/components/studio/timeline-clips-strip'
 
 type TabId = 'basic' | 'effects' | 'adjust'
 
@@ -31,6 +35,15 @@ export type MarkitEditorViewProps = {
   presets: { id: string; label: string; description: string }[]
   onPresetClick: (p: { id: string; label: string; description: string }) => void
   onQuickAssist: (hint: string) => void
+  /** Parsed ```markit-edit``` plan from the latest assistant message */
+  pendingEditPlan: MarkitEditPlanV1 | null
+  onApplyAiEditPlan: () => void
+  hasSecondaryImport: boolean
+  /** Multi-clip timeline (Phase 2) */
+  timelineSegments: TimelineSegment[]
+  onTimelineSegmentsChange: (segments: TimelineSegment[]) => void
+  onExportTimeline: () => void
+  onVideoDuration: (sec: number) => void
   /** Ariadne */
   ariadneBlock: ReactNode
 }
@@ -64,6 +77,13 @@ export function MarkitEditorView({
   presets,
   onPresetClick,
   onQuickAssist,
+  pendingEditPlan,
+  onApplyAiEditPlan,
+  hasSecondaryImport,
+  timelineSegments,
+  onTimelineSegmentsChange,
+  onExportTimeline,
+  onVideoDuration,
   ariadneBlock,
 }: MarkitEditorViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -77,8 +97,11 @@ export function MarkitEditorView({
     const v = videoRef.current
     if (!v) return
     const d = v.duration
-    if (Number.isFinite(d)) setDuration(d)
-  }, [])
+    if (Number.isFinite(d)) {
+      setDuration(d)
+      onVideoDuration(d)
+    }
+  }, [onVideoDuration])
 
   const onTick = useCallback(() => {
     const v = videoRef.current
@@ -121,6 +144,17 @@ export function MarkitEditorView({
     v.currentTime = t
     setCurrentTime(t)
   }, [duration])
+
+  const seekToSeconds = useCallback(
+    (sec: number) => {
+      const v = videoRef.current
+      if (!v || !duration) return
+      const t = Math.min(Math.max(0, sec), duration)
+      v.currentTime = t
+      setCurrentTime(t)
+    },
+    [duration],
+  )
 
   const ct = Math.floor(currentTime)
   const assistHint = `I can help you edit at ${formatTime(currentTime)}. What would you like to do?`
@@ -301,9 +335,20 @@ export function MarkitEditorView({
                 </div>
                 <div className="flex flex-wrap gap-1 border-b border-[var(--border)] px-2 py-2">
                   {[
-                    { label: `Split idea @ ${ct}s`, hint: `Give edit steps to split around ${ct}s` },
-                    { label: 'Music', hint: 'Suggest background music and levels for this clip.' },
-                    { label: 'Look', hint: 'Suggest color grading and visual polish for this clip.' },
+                    {
+                      label: 'Teaser',
+                      hint:
+                        'Propose a short teaser (under 60s) as segment timestamps, and include a ```markit-edit``` JSON block so I can build it.',
+                    },
+                    {
+                      label: 'Compilation',
+                      hint:
+                        'Propose a highlight compilation with segment timestamps and a ```markit-edit``` JSON block (concat_segments) to assemble it.',
+                    },
+                    {
+                      label: `Cut @ ${ct}s`,
+                      hint: `Suggest edits around ${ct}s and include a markit-edit plan if you can.`,
+                    },
                   ].map((q) => (
                     <button
                       key={q.label}
@@ -335,6 +380,33 @@ export function MarkitEditorView({
                     ))
                   )}
                 </div>
+                {pendingEditPlan ? (
+                  <div className="border-t border-[var(--border)] px-2 py-2">
+                    <p className="mb-1 text-[10px] font-medium" style={{ color: 'var(--studio-accent)' }}>
+                      AI edit ready
+                    </p>
+                    <p className="mb-2 text-[10px] leading-snug" style={{ color: 'var(--muted-foreground)' }}>
+                      {pendingEditPlan.segments.length} segment{pendingEditPlan.segments.length === 1 ? '' : 's'}
+                      {pendingEditPlan.label ? ` · ${pendingEditPlan.label}` : ''}. Renders in your browser, then uploads to
+                      the vault.
+                    </p>
+                    {planNeedsSecondarySource(pendingEditPlan) && !hasSecondaryImport ? (
+                      <p className="mb-2 text-[10px] text-amber-400/90">
+                        This plan uses a second angle — add <code className="text-[9px]">importUrl2</code> (second asset URL)
+                        to the page query.
+                      </p>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={!canExport || exportBusy || (planNeedsSecondarySource(pendingEditPlan) && !hasSecondaryImport)}
+                      onClick={onApplyAiEditPlan}
+                      className="w-full rounded-lg py-2 text-xs font-semibold disabled:opacity-40"
+                      style={{ background: 'var(--studio-accent)', color: 'var(--primary-foreground)' }}
+                    >
+                      {exportBusy ? 'Working…' : 'Build & upload to vault'}
+                    </button>
+                  </div>
+                ) : null}
                 <form
                   className="flex gap-1 border-t border-[var(--border)] p-2"
                   onSubmit={(e) => {
@@ -345,7 +417,11 @@ export function MarkitEditorView({
                   <input
                     value={chatInput}
                     onChange={(e) => onChatInputChange(e.target.value)}
-                    placeholder={canUseAi ? 'Ask anything…' : 'Sign in or use vault bridge'}
+                    placeholder={
+                      canUseAi
+                        ? 'Teaser, compilation, rough cut — assistant can output a buildable plan…'
+                        : 'Sign in or use vault bridge'
+                    }
                     disabled={!canUseAi || aiBusy}
                     className="min-w-0 flex-1 rounded-lg border border-[var(--border)] bg-black/30 px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-[var(--studio-accent)] disabled:opacity-40"
                   />
@@ -457,14 +533,44 @@ export function MarkitEditorView({
 
       {/* Timeline */}
       <footer className="shrink-0 border-t border-[var(--border)] px-2 py-2" style={{ background: 'var(--timeline-track)' }}>
-        <div className="mb-1 flex items-center justify-between px-1">
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-2 px-1">
           <span className="text-[11px] font-medium uppercase tracking-wide" style={{ color: 'var(--muted-foreground)' }}>
             Timeline
           </span>
-          <span className="font-mono text-[10px]" style={{ color: 'var(--muted-foreground)' }}>
-            {formatTime(currentTime)} / {formatTime(duration)}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-[10px]" style={{ color: 'var(--muted-foreground)' }}>
+              {formatTime(currentTime)} / {formatTime(duration)}
+            </span>
+            {importUrl ? (
+              <button
+                type="button"
+                disabled={
+                  !canExport ||
+                  exportBusy ||
+                  timelineSegments.length === 0 ||
+                  (timelineSegments.some((s) => s.source === 'secondary') && !hasSecondaryImport)
+                }
+                onClick={onExportTimeline}
+                className="rounded-lg px-2 py-1 text-[10px] font-semibold disabled:opacity-40"
+                style={{ background: 'var(--studio-accent)', color: 'var(--primary-foreground)' }}
+              >
+                Export clip list
+              </button>
+            ) : null}
+          </div>
         </div>
+        {importUrl ? (
+          <TimelineClipsStrip
+            duration={duration}
+            currentTime={currentTime}
+            segments={timelineSegments}
+            onSegmentsChange={onTimelineSegmentsChange}
+            videoRef={videoRef}
+            hasSecondaryImport={hasSecondaryImport}
+            disabled={!canExport || exportBusy}
+            onSeek={seekToSeconds}
+          />
+        ) : null}
         <div
           ref={timelineRef}
           role="slider"

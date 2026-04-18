@@ -10,6 +10,16 @@ import { parseVaultContentIdFromExportUrl } from '@/lib/content-id'
 import presetsData from '@/lib/data/frame-edit-presets.json'
 import { VideoTrimSection } from '@/components/video-trim-section'
 import { MarkitEditorView } from '@/components/studio/markit-editor-view'
+import type { MarkitEditPlanV1 } from '@/lib/markit-edit-plan'
+import { findLatestEditPlan, planNeedsSecondarySource } from '@/lib/markit-edit-plan'
+import { runMarkitEditPlan } from '@/lib/run-markit-edit-plan'
+import {
+  clampAllSegments,
+  loadTimelineFromStorage,
+  saveTimelineToStorage,
+  timelineToEditPlan,
+} from '@/lib/timeline-project'
+import type { TimelineSegment } from '@/lib/timeline-project'
 
 const CREATIX = process.env.NEXT_PUBLIC_CREATIX_APP_URL || 'https://www.circeetvenus.com'
 
@@ -25,8 +35,11 @@ export function EditorApp() {
   const importUrl = sp.get('importUrl') || ''
   const exportUrl = sp.get('exportUrl') || ''
   const exportToken = sp.get('exportToken') || ''
+  /** Second vault asset (optional): same query shape from a second `frame-session` — for multi-angle cuts. */
+  const importUrl2 = sp.get('importUrl2') || ''
 
   const hasVaultBridge = Boolean(importUrl && exportUrl && exportToken)
+  const hasSecondaryImport = Boolean(importUrl2)
   const contentId = useMemo(() => (exportUrl ? parseVaultContentIdFromExportUrl(exportUrl) : null), [exportUrl])
 
   const [sessionUserId, setSessionUserId] = useState<string | null>(null)
@@ -74,6 +87,27 @@ export function EditorApp() {
 
   const canManualExport = hasVaultBridge
 
+  /** POST one file to the primary vault slot (bridge). */
+  const postFileToVault = useCallback(
+    async (file: File): Promise<boolean> => {
+      if (!hasVaultBridge) return false
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('exportToken', exportToken)
+      const res = await fetch(exportUrl, { method: 'POST', body: fd, credentials: 'omit' })
+      const text = await res.text()
+      if (!res.ok) {
+        console.error('[markit] vault export failed', { status: res.status })
+        setExportStatus(`Upload failed (${res.status}): ${text.slice(0, 400)}`)
+        return false
+      }
+      setExportStatus('Saved to your vault. Refresh Media & vault on Circe et Venus.')
+      setVaultUploadOk(true)
+      return true
+    },
+    [exportToken, exportUrl, hasVaultBridge],
+  )
+
   const pushFile = useCallback(
     async (file: File) => {
       if (!hasVaultBridge) return
@@ -81,25 +115,14 @@ export function EditorApp() {
       setExportStatus(null)
       setVaultUploadOk(false)
       try {
-        const fd = new FormData()
-        fd.append('file', file)
-        fd.append('exportUrl', exportUrl)
-        fd.append('exportToken', exportToken)
-        const res = await fetch('/api/export', { method: 'POST', body: fd })
-        const text = await res.text()
-        if (!res.ok) {
-          setExportStatus(`Upload failed (${res.status}): ${text.slice(0, 400)}`)
-        } else {
-          setExportStatus('Saved to your vault. Refresh Media & vault on Circe et Venus.')
-          setVaultUploadOk(true)
-        }
+        await postFileToVault(file)
       } catch (e) {
         setExportStatus(e instanceof Error ? e.message : 'Upload failed')
       } finally {
         setExportBusy(false)
       }
     },
-    [exportToken, exportUrl, hasVaultBridge],
+    [hasVaultBridge, postFileToVault],
   )
 
   const sendSourceToVault = useCallback(async () => {
@@ -193,6 +216,85 @@ export function EditorApp() {
     void runAssist(t)
     setChatInput('')
   }, [canUseAi, chatInput, runAssist])
+
+  const pendingEditPlan = useMemo(() => findLatestEditPlan(chatMessages), [chatMessages])
+
+  const [timelineSegments, setTimelineSegments] = useState<TimelineSegment[]>([])
+  const [videoDuration, setVideoDuration] = useState(0)
+
+  useEffect(() => {
+    if (!contentId) {
+      setTimelineSegments([])
+      return
+    }
+    setTimelineSegments(loadTimelineFromStorage(contentId))
+  }, [contentId])
+
+  useEffect(() => {
+    if (!contentId) return
+    saveTimelineToStorage(contentId, timelineSegments)
+  }, [contentId, timelineSegments])
+
+  useEffect(() => {
+    if (videoDuration <= 0) return
+    setTimelineSegments((prev) => clampAllSegments(prev, videoDuration))
+  }, [videoDuration])
+
+  const executeEditPlan = useCallback(
+    async (plan: MarkitEditPlanV1) => {
+      if (!importUrl || !hasVaultBridge) return
+      setExportBusy(true)
+      setExportStatus(null)
+      setVaultUploadOk(false)
+      try {
+        setExportStatus('Loading main video…')
+        const pres = await fetch(importUrl, { method: 'GET', mode: 'cors' })
+        if (!pres.ok) throw new Error(`Could not read main video (${pres.status}).`)
+        const primaryBlob = await pres.blob()
+
+        let secondaryBlob: Blob | null = null
+        if (planNeedsSecondarySource(plan)) {
+          if (!hasSecondaryImport) {
+            throw new Error(
+              'This plan uses a second angle. Add importUrl2=… to the Markit URL (asset URL from a second vault item’s frame session).',
+            )
+          }
+          setExportStatus('Loading second angle…')
+          const sres = await fetch(importUrl2, { method: 'GET', mode: 'cors' })
+          if (!sres.ok) throw new Error(`Could not read second video (${sres.status}).`)
+          secondaryBlob = await sres.blob()
+        }
+
+        setExportStatus('Rendering cuts in your browser…')
+        const out = await runMarkitEditPlan(primaryBlob, secondaryBlob, plan, (p) => {
+          if (p.message) setExportStatus(p.message)
+        })
+        const baseName = (plan.label || 'markit-export').replace(/[^\w.-]+/g, '_').slice(0, 72) || 'markit-export'
+        const file = new File([out], `${baseName}.mp4`, { type: 'video/mp4' })
+        setExportStatus('Uploading to vault…')
+        await postFileToVault(file)
+      } catch (e) {
+        console.error('[markit] edit export failed', e instanceof Error ? e.message : e)
+        setExportStatus(e instanceof Error ? e.message : 'Export failed')
+        setVaultUploadOk(false)
+      } finally {
+        setExportBusy(false)
+      }
+    },
+    [hasSecondaryImport, hasVaultBridge, importUrl, importUrl2, postFileToVault],
+  )
+
+  const applyAiEditPlan = useCallback(async () => {
+    const plan = findLatestEditPlan(chatMessagesRef.current)
+    if (!plan) return
+    await executeEditPlan(plan)
+  }, [executeEditPlan])
+
+  const exportTimelineToVault = useCallback(async () => {
+    if (timelineSegments.length === 0) return
+    const plan = timelineToEditPlan(timelineSegments, 'timeline-export')
+    await executeEditPlan(plan)
+  }, [executeEditPlan, timelineSegments])
 
   const [recipientKey, setRecipientKey] = useState('')
   const [ariadneBusy, setAriadneBusy] = useState(false)
@@ -358,6 +460,13 @@ export function EditorApp() {
       }}
       onQuickAssist={(hint) => void runAssist(hint)}
       ariadneBlock={ariadneBlock}
+      pendingEditPlan={pendingEditPlan}
+      onApplyAiEditPlan={() => void applyAiEditPlan()}
+      hasSecondaryImport={hasSecondaryImport}
+      timelineSegments={timelineSegments}
+      onTimelineSegmentsChange={setTimelineSegments}
+      onExportTimeline={() => void exportTimelineToVault()}
+      onVideoDuration={setVideoDuration}
     />
   )
 }

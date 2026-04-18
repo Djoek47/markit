@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+/**
+ * Optional proxy: forwards multipart to Creatix with `X-Frame-Export-Secret`.
+ * The Markit editor POSTs **directly** to Creatix `exportUrl` instead (avoids Vercel ~4.5MB body limits).
+ * Keep this route for scripts or older clients.
+ */
 const DEFAULT_HOSTS = ['www.circeetvenus.com', 'circeetvenus.com']
 
 function isAllowedExportUrl(url: string): boolean {
