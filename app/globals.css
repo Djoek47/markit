@@ -2,26 +2,34 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Hard-reset studio tokens: clean contrast, low visual noise. */
 :root {
-  --background: oklch(0.1 0.015 285);
-  --foreground: oklch(0.97 0.01 280);
-  --card: oklch(0.14 0.02 285);
-  --card-foreground: oklch(0.96 0.01 280);
-  --muted: oklch(0.22 0.02 280);
-  --muted-foreground: oklch(0.62 0.02 280);
-  --border: oklch(0.28 0.02 280 / 0.6);
-  --studio-accent: oklch(0.62 0.23 292);
-  --studio-accent-hover: oklch(0.52 0.24 290);
-  --studio-accent-muted: oklch(0.58 0.24 290 / 0.25);
-  --primary: oklch(0.58 0.24 290);
-  --primary-foreground: oklch(0.98 0 0);
+  --background: oklch(0.08 0 0);
+  --foreground: oklch(0.95 0 0);
+  --card: oklch(0.12 0.005 285);
+  --card-2: oklch(0.1 0.005 285);
+  --card-foreground: oklch(0.95 0 0);
+  --muted: oklch(0.16 0.005 285);
+  --muted-foreground: oklch(0.6 0 0);
+  --muted-faint: oklch(0.45 0 0);
+  --border: oklch(0.22 0.015 285);
+  --border-soft: oklch(0.18 0.01 285);
+  --primary: oklch(0.78 0.14 85);
+  --primary-soft: oklch(0.85 0.12 85);
+  --primary-foreground: oklch(0.1 0 0);
   --circe: oklch(0.55 0.2 295);
-  --circe-light: oklch(0.72 0.16 295);
-  --gold: oklch(0.78 0.14 85);
+  --circe-light: oklch(0.7 0.18 295);
+  --info: oklch(0.65 0.15 295);
+  --success: oklch(0.7 0.14 150);
+  --destructive: oklch(0.62 0.2 25);
+  --gold: var(--primary);
   --radius: 0.5rem;
-  --timeline-track: oklch(0.19 0.02 282);
-  --timeline-clip: oklch(0.5 0.1 291);
+  --timeline-track: oklch(0.11 0.01 285);
+  --timeline-ruler: oklch(0.17 0.01 285);
+  --timeline-video: oklch(0.78 0.14 85 / 0.55);
+  --timeline-audio: oklch(0.55 0.2 295 / 0.5);
+  --timeline-overlay: oklch(0.65 0.15 295 / 0.45);
+  --divine-shadow: 0 12px 36px oklch(0.78 0.14 85 / 0.35);
+  --sidebar: oklch(0.06 0 0);
 }
 
 html {
@@ -35,8 +43,1096 @@ body {
   min-height: 100dvh;
 }
 
+.font-mono-ui {
+  font-family: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 .font-serif-display {
   font-family: var(--font-cinzel), ui-serif, Georgia, serif;
+}
+
+:root[data-density='simple'] {
+  --row-h: 44px;
+  --pad: 18px;
+}
+
+:root[data-density='pro'] {
+  --row-h: 32px;
+  --pad: 12px;
+}
+
+:root[data-density='simple'] .pro-only {
+  display: none !important;
+}
+
+:root[data-density='pro'] .simple-only {
+  display: none !important;
+}
+
+/* ── Markit v2 shell (aligned to markit-editor.html mock) ── */
+.markit-shell {
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.markit-shell .mk-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--sidebar);
+  min-height: 52px;
+}
+
+.markit-shell .mk-h-left {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  min-width: 0;
+}
+
+.markit-shell .mk-brand {
+  font-family: var(--font-cinzel), ui-serif, Georgia, serif;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--foreground);
+}
+
+.markit-shell .mk-brand .mk-sep {
+  color: var(--primary);
+  margin: 0 6px;
+  font-style: italic;
+  font-weight: 400;
+}
+
+.markit-shell .mk-beta {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 9px;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--muted-foreground);
+  letter-spacing: 0.18em;
+  margin-left: 8px;
+  text-transform: uppercase;
+  font-weight: 400;
+}
+
+.markit-shell .mk-mode-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.markit-shell .mk-mode-pill button {
+  padding: 5px 14px;
+  border: none;
+  background: transparent;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  border-radius: 999px;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+
+.markit-shell .mk-mode-pill button:hover:not(.mk-active) {
+  color: var(--foreground);
+}
+
+.markit-shell .mk-mode-pill button.mk-active {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.markit-shell .mk-h-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.markit-shell .mk-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-weight: 500;
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    color 0.15s;
+}
+
+.markit-shell .mk-btn:hover {
+  border-color: var(--muted-faint);
+}
+
+.markit-shell .mk-btn-primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
+
+.markit-shell .mk-btn-primary:hover {
+  background: var(--primary-soft);
+  border-color: var(--primary-soft);
+}
+
+.markit-shell .mk-btn-ghost {
+  border-color: transparent;
+  color: var(--muted-foreground);
+}
+
+.markit-shell .mk-btn-ghost:hover {
+  color: var(--foreground);
+  border-color: var(--border);
+}
+
+.markit-shell .mk-library {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--sidebar);
+  border-right: 1px solid var(--border);
+  min-height: 0;
+}
+
+.markit-shell .mk-lib-head {
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.markit-shell .mk-lib-head h2 {
+  font-family: var(--font-cinzel), ui-serif, Georgia, serif;
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--foreground);
+  margin-bottom: 2px;
+}
+
+.markit-shell .mk-lib-head h2 em {
+  font-style: italic;
+  color: var(--primary);
+  font-weight: 400;
+}
+
+.markit-shell .mk-lib-count {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.markit-shell .mk-lib-search {
+  margin: 10px 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  transition: border-color 0.15s;
+}
+
+.markit-shell .mk-lib-search:focus-within {
+  border-color: var(--primary);
+}
+
+.markit-shell .mk-lib-search input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--foreground);
+  font-size: 12px;
+}
+
+.markit-shell .mk-lib-search input::placeholder {
+  color: var(--muted-faint);
+}
+
+.markit-shell .mk-lib-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 12px 16px 8px;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.markit-shell .mk-lib-tab {
+  background: none;
+  border: none;
+  padding: 5px 9px;
+  border-radius: 4px;
+  color: var(--muted-foreground);
+  transition: all 0.15s;
+}
+
+.markit-shell .mk-lib-tab:hover:not(.mk-active) {
+  color: var(--foreground);
+}
+
+.markit-shell .mk-lib-tab.mk-active {
+  color: var(--primary);
+  background: color-mix(in oklch, var(--primary) 12%, transparent);
+}
+
+.markit-shell .mk-lib-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.markit-shell .mk-media {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 10px;
+  padding: 7px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: grab;
+  transition: all 0.15s;
+  align-items: center;
+}
+
+.markit-shell .mk-media:hover {
+  background: var(--card);
+  border-color: var(--border-soft);
+}
+
+.markit-shell .mk-media.mk-selected {
+  background: var(--card);
+  border-color: var(--primary);
+}
+
+.markit-shell .mk-media:active {
+  cursor: grabbing;
+}
+
+.markit-shell .mk-thumb {
+  width: 64px;
+  height: 36px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: linear-gradient(135deg, oklch(0.18 0.02 285), oklch(0.1 0.01 285));
+  border: 1px solid var(--border-soft);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.markit-shell .mk-stage {
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  overflow: hidden;
+  min-width: 0;
+  background: var(--background);
+  min-height: 0;
+}
+
+.markit-shell .mk-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 12px var(--pad, 18px);
+  border-bottom: 1px solid var(--border);
+}
+
+.markit-shell .mk-toolbar .mk-spacer {
+  flex: 1;
+}
+
+.markit-shell .mk-toolbar-meta {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted-faint);
+}
+
+.markit-shell .mk-preview-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px var(--pad, 18px);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.markit-shell .mk-preview {
+  position: relative;
+  width: 100%;
+  max-width: 880px;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.markit-shell .mk-preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.markit-shell .mk-preview-empty .mk-sigil {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 12px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
+.markit-shell .mk-preview-empty .mk-label {
+  font-family: var(--font-cinzel), ui-serif, Georgia, serif;
+  font-style: italic;
+  font-size: 15px;
+  color: var(--muted-foreground);
+  letter-spacing: 0.02em;
+}
+
+.markit-shell .mk-preview-empty .mk-hint {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-top: 6px;
+  color: var(--muted-faint);
+}
+
+.markit-shell .mk-transport {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px var(--pad, 18px);
+  border-top: 1px solid var(--border);
+}
+
+.markit-shell .mk-tp-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  transition: all 0.15s;
+}
+
+.markit-shell .mk-tp-btn:hover {
+  border-color: var(--muted-faint);
+}
+
+.markit-shell .mk-tp-btn.mk-play {
+  width: 32px;
+  height: 32px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
+
+.markit-shell .mk-tp-btn.mk-play:hover {
+  background: var(--primary-soft);
+}
+
+.markit-shell .mk-tp-time {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--foreground);
+  letter-spacing: 0.04em;
+  min-width: 130px;
+}
+
+.markit-shell .mk-tp-time .mk-sep {
+  color: var(--muted-faint);
+  margin: 0 5px;
+}
+
+.markit-shell .mk-tp-time .mk-total {
+  color: var(--muted-foreground);
+}
+
+.markit-shell .mk-timeline-zone {
+  border-top: 1px solid var(--border);
+  background: var(--card-2);
+  padding: 10px var(--pad, 18px) 14px;
+  max-height: 38vh;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.markit-shell .mk-tl-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.markit-shell .mk-tl-head h3 {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+
+.markit-shell .mk-tl-ruler {
+  height: 18px;
+  position: relative;
+  border-bottom: 1px solid var(--border-soft);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 9px;
+  color: var(--muted-faint);
+  margin-left: 56px;
+  letter-spacing: 0.04em;
+}
+
+.markit-shell .mk-track {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 0;
+  align-items: center;
+  min-height: 36px;
+}
+
+.markit-shell .mk-track-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 8px;
+  height: 100%;
+  border-right: 1px solid var(--border-soft);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.markit-shell .mk-swatch {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+.markit-shell .mk-swatch.v {
+  background: var(--primary);
+}
+
+.markit-shell .mk-swatch.a {
+  background: var(--circe-light);
+}
+
+.markit-shell .mk-swatch.o {
+  background: var(--info);
+}
+
+.markit-shell .mk-track-lane {
+  position: relative;
+  height: 32px;
+  margin: 0 0 0 8px;
+  background:
+    linear-gradient(
+      to right,
+      transparent calc(50% - 0.5px),
+      var(--border-soft) calc(50% - 0.5px),
+      var(--border-soft) calc(50% + 0.5px),
+      transparent calc(50% + 0.5px)
+    );
+  border-radius: 3px;
+  border: 1px dashed var(--border-soft);
+}
+
+.markit-shell .mk-clip {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    filter 0.15s,
+    outline-color 0.15s;
+  outline: 2px solid transparent;
+  outline-offset: 1px;
+  border: none;
+  text-align: left;
+}
+
+.markit-shell .mk-clip:hover {
+  filter: brightness(1.08);
+}
+
+.markit-shell .mk-clip.mk-selected {
+  outline-color: var(--foreground);
+}
+
+.markit-shell .mk-clip.video {
+  background: linear-gradient(180deg, var(--primary), color-mix(in oklch, var(--primary) 80%, black));
+  color: var(--primary-foreground);
+}
+
+.markit-shell .mk-clip.audio {
+  background: linear-gradient(180deg, var(--circe-light), var(--circe));
+  color: var(--foreground);
+}
+
+.markit-shell .mk-clip.overlay {
+  background: linear-gradient(180deg, var(--info), color-mix(in oklch, var(--info) 70%, black));
+  color: var(--foreground);
+}
+
+.markit-shell .mk-playhead {
+  position: absolute;
+  top: -18px;
+  bottom: 0;
+  width: 1px;
+  background: var(--primary);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.markit-shell .mk-playhead::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--primary);
+}
+
+.markit-shell .mk-inspector {
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border-left: 1px solid var(--border);
+  overflow: hidden;
+  min-height: 0;
+}
+
+.markit-shell .mk-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.markit-shell .mk-tab {
+  flex: 1;
+  padding: 12px 6px;
+  text-align: center;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid transparent;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  transition: all 0.15s;
+}
+
+.markit-shell .mk-tab:hover {
+  color: var(--foreground);
+}
+
+.markit-shell .mk-tab.mk-active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+.markit-shell .mk-panels {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.markit-shell .mk-section {
+  padding: 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.markit-shell .mk-section h4 {
+  font-family: var(--font-cinzel), ui-serif, Georgia, serif;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--foreground);
+  margin-bottom: 4px;
+}
+
+.markit-shell .mk-section h4 em {
+  font-style: italic;
+  color: var(--primary);
+  font-weight: 400;
+}
+
+.markit-shell .mk-section .mk-desc {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  margin-bottom: 14px;
+  line-height: 1.55;
+}
+
+.markit-shell .mk-statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-top: 1px solid var(--border);
+  background: var(--sidebar);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  min-height: 28px;
+}
+
+.markit-shell .mk-statusbar .mk-sb-group {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+
+.markit-shell .mk-sb-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.markit-shell .mk-sb-dot.gold {
+  background: var(--primary);
+}
+
+.markit-shell .mk-sb-dot.green {
+  background: var(--success);
+}
+
+.markit-shell .divine-fab {
+  position: fixed;
+  bottom: 50px;
+  right: 24px;
+  z-index: 100;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, var(--primary-soft), var(--primary) 65%);
+  border: none;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  color: var(--primary-foreground);
+  box-shadow:
+    0 8px 24px color-mix(in oklch, var(--primary) 30%, transparent),
+    0 0 0 1px color-mix(in oklch, var(--primary) 50%, transparent);
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+
+.markit-shell .divine-fab:hover {
+  transform: translateY(-2px);
+}
+
+.markit-shell .divine-fab::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in oklch, var(--primary) 40%, transparent);
+  animation: mk-orb-pulse 2.4s infinite ease-out;
+  pointer-events: none;
+}
+
+@keyframes mk-orb-pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
+.markit-shell .divine-popper {
+  position: fixed;
+  bottom: 116px;
+  right: 24px;
+  z-index: 101;
+  width: 360px;
+  max-width: calc(100vw - 48px);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow:
+    0 24px 60px -8px rgba(0, 0, 0, 0.5),
+    0 0 0 1px color-mix(in oklch, var(--primary) 20%, transparent);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.markit-shell .divine-popper::before {
+  content: '';
+  position: absolute;
+  bottom: -7px;
+  right: 30px;
+  width: 12px;
+  height: 12px;
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  transform: rotate(45deg);
+}
+
+.markit-shell .dp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.markit-shell .dp-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.markit-shell .dp-orb-mini {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, var(--primary-soft), var(--primary) 65%);
+}
+
+.markit-shell .dp-title h5 {
+  font-family: var(--font-cinzel), ui-serif, Georgia, serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--foreground);
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+
+.markit-shell .dp-title h5 em {
+  font-style: italic;
+  color: var(--primary);
+}
+
+.markit-shell .dp-title small {
+  display: block;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  margin-top: 1px;
+}
+
+.markit-shell .dp-close {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  color: var(--muted-foreground);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.markit-shell .dp-close:hover {
+  color: var(--foreground);
+  background: var(--card-2);
+}
+
+.markit-shell .dp-body {
+  padding: 14px 16px;
+}
+
+.markit-shell .dp-prompt {
+  background: var(--card-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  padding: 11px 13px;
+  font-family: var(--font-cinzel), ui-serif, Georgia, serif;
+  font-style: italic;
+  font-size: 14px;
+  color: var(--foreground);
+  line-height: 1.45;
+  margin-bottom: 12px;
+  position: relative;
+}
+
+.markit-shell .dp-prompt::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 12px;
+  bottom: 12px;
+  width: 2px;
+  background: var(--primary);
+  border-radius: 1px;
+}
+
+.markit-shell .dp-prompt .dp-who {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--primary);
+  font-style: normal;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.markit-shell .dp-presets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin-bottom: 12px;
+}
+
+.markit-shell .dp-preset {
+  padding: 7px 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  text-align: left;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  transition: all 0.15s;
+  cursor: pointer;
+}
+
+.markit-shell .dp-preset:hover {
+  color: var(--foreground);
+  border-color: var(--muted-faint);
+}
+
+.markit-shell .dp-mic {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: default;
+  transition: border-color 0.15s;
+}
+
+.markit-shell .dp-mic:hover {
+  border-color: var(--primary);
+}
+
+.markit-shell .dp-mic.live {
+  border-color: var(--primary);
+  background: color-mix(in oklch, var(--primary) 8%, var(--card-2));
+}
+
+.markit-shell .dp-mic .mic-orb {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--primary);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--primary-foreground);
+}
+
+.markit-shell .dp-mic .mic-orb svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2;
+}
+
+.markit-shell .dp-mic .label {
+  font-family: var(--font-cinzel), ui-serif, Georgia, serif;
+  font-style: italic;
+  font-size: 13px;
+  color: var(--muted-foreground);
+  flex: 1;
+}
+
+.markit-shell .dp-mic.live .label {
+  color: var(--foreground);
+}
+
+.markit-shell .dp-mic .wave-mini {
+  display: none;
+  gap: 2px;
+  align-items: center;
+  height: 16px;
+}
+
+.markit-shell .dp-mic.live .wave-mini {
+  display: flex;
+}
+
+.markit-shell .dp-mic .wave-mini span {
+  width: 2px;
+  background: var(--primary);
+  border-radius: 1px;
+  animation: mk-micwave 1s infinite ease-in-out;
+}
+
+.markit-shell .dp-mic .wave-mini span:nth-child(1) {
+  height: 6px;
+  animation-delay: 0s;
+}
+
+.markit-shell .dp-mic .wave-mini span:nth-child(2) {
+  height: 12px;
+  animation-delay: 0.1s;
+}
+
+.markit-shell .dp-mic .wave-mini span:nth-child(3) {
+  height: 16px;
+  animation-delay: 0.2s;
+}
+
+.markit-shell .dp-mic .wave-mini span:nth-child(4) {
+  height: 10px;
+  animation-delay: 0.3s;
+}
+
+.markit-shell .dp-mic .wave-mini span:nth-child(5) {
+  height: 6px;
+  animation-delay: 0.4s;
+}
+
+@keyframes mk-micwave {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.3);
+  }
+}
+
+.markit-shell .dp-foot {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.markit-shell .dp-foot kbd {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 9px;
+  background: var(--card-2);
+  border: 1px solid var(--border-soft);
+  padding: 1px 4px;
+  border-radius: 3px;
+  color: var(--foreground);
+}
+
+/* Scoped range styling (mock) — only inside editor shell */
+.markit-shell input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  background: transparent;
+  height: 16px;
+}
+
+.markit-shell input[type='range']::-webkit-slider-runnable-track {
+  height: 2px;
+  background: var(--border);
+  border-radius: 999px;
+}
+
+.markit-shell input[type='range']::-moz-range-track {
+  height: 2px;
+  background: var(--border);
+  border-radius: 999px;
+}
+
+.markit-shell input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--primary);
+  margin-top: -4.5px;
+  border: none;
+  box-shadow: 0 0 0 3px var(--card);
+  transition: box-shadow 0.15s;
+}
+
+.markit-shell input[type='range']::-webkit-slider-thumb:hover {
+  box-shadow:
+    0 0 0 3px var(--card),
+    0 0 0 5px color-mix(in oklch, var(--primary) 30%, transparent);
+}
+
+.markit-shell input[type='range']::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: none;
 }
 
 /* Legacy utility used on sign-in */
@@ -56,6 +1152,10 @@ body {
   height: 6px;
 }
 .studio-scrollbar::-webkit-scrollbar-thumb {
-  background: oklch(0.4 0.03 280 / 0.5);
+  background: oklch(0.4 0.02 280 / 0.5);
   border-radius: 3px;
+}
+
+input[type='range'] {
+  accent-color: var(--primary);
 }

@@ -28,7 +28,6 @@ export type MarkitEditorViewProps = {
   aiBusy: boolean
   aiError: string | null
   presets: { id: string; label: string; description: string }[]
-  onQuickAssist: (hint: string) => void
   pendingEditPlan: MarkitEditPlanV1 | null
   onApplyAiEditPlan: () => void
   hasSecondaryImport: boolean
@@ -116,7 +115,6 @@ export function MarkitEditorView({
   aiBusy,
   aiError,
   presets,
-  onQuickAssist,
   pendingEditPlan,
   onApplyAiEditPlan,
   hasSecondaryImport,

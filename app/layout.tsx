@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Cinzel, DM_Sans } from 'next/font/google'
+import { Cinzel, DM_Sans, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 
 const cinzel = Cinzel({
@@ -14,6 +14,12 @@ const dmSans = DM_Sans({
   weight: ['400', '500', '600', '700'],
 })
 
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-jetbrains-mono',
+  weight: ['400', '500', '600'],
+})
+
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
@@ -25,7 +31,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
-      <body className={`${dmSans.variable} ${cinzel.variable} min-h-screen antialiased`}>{children}</body>
+      <body className={`${dmSans.variable} ${cinzel.variable} ${jetBrainsMono.variable} min-h-screen antialiased`}>
+        {children}
+      </body>
     </html>
   )
 }

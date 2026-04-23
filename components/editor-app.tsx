@@ -9,7 +9,7 @@ import { isPaidSubscription } from '@/lib/billing'
 import { parseVaultContentIdFromExportUrl } from '@/lib/content-id'
 import presetsData from '@/lib/data/frame-edit-presets.json'
 import { VideoTrimSection } from '@/components/video-trim-section'
-import { MarkitEditorView } from '@/components/studio/markit-editor-view'
+import { MarkitEditorV2 } from '@/components/studio/markit-editor-v2'
 import type { MarkitEditPlanV1 } from '@/lib/markit-edit-plan'
 import { findLatestEditPlan, planNeedsSecondarySource } from '@/lib/markit-edit-plan'
 import { runMarkitEditPlan } from '@/lib/run-markit-edit-plan'
@@ -20,14 +20,10 @@ import {
   timelineToEditPlan,
 } from '@/lib/timeline-project'
 import type { TimelineSegment } from '@/lib/timeline-project'
-import { orchestrateBrief } from '@/lib/agents/orchestrator'
-import { agentPlanToOperations } from '@/lib/agents/plans-to-timeline'
-import { applyOperations, createClipAtPlayhead } from '@/lib/editor/edit-operations'
+import { createClipAtPlayhead } from '@/lib/editor/edit-operations'
 import { createExportManifest } from '@/lib/editor/export-plan'
-import { createInitialTimeline } from '@/lib/editor/timeline-model'
 import { flagFramerTracedExport } from '@/lib/flags'
 import { isFullFrameCrop } from '@/lib/crop-utils'
-import { buildPresetSegments } from '@/lib/editor/preset-timeline'
 
 const CREATIX = process.env.NEXT_PUBLIC_CREATIX_APP_URL || 'https://www.circeetvenus.com'
 
@@ -233,9 +229,6 @@ export function EditorApp() {
   const [cropRect, setCropRect] = useState({ x: 0, y: 0, width: 1, height: 1 })
   const previewObjectUrlRef = useRef<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [previewBusy, setPreviewBusy] = useState(false)
-
-  const canBuildPreview = hasVaultBridge && Boolean(importUrl) && videoDuration > 0
 
   useEffect(() => {
     if (!contentId) {
@@ -288,7 +281,6 @@ export function EditorApp() {
         setExportStatus('Wait for the source video to load.')
         return
       }
-      setPreviewBusy(true)
       setExportStatus('Rendering preview in your browser…')
       try {
         const plan = timelineToEditPlan(segments, 'markit-preview', cropRect)
@@ -325,58 +317,11 @@ export function EditorApp() {
                 : `Preview failed: ${String(e)}`
         setExportStatus(message)
       } finally {
-        setPreviewBusy(false)
+        // keep status messages only; no separate busy spinner in v2 shell
       }
     },
     [cropRect, hasVaultBridge, importUrl, videoDuration],
   )
-
-  const runPresetAndPreview = useCallback(
-    (presetId: string) => {
-      if (!canBuildPreview) return
-      const segments = buildPresetSegments(presetId, videoDuration)
-      setTimelineSegments(segments)
-      setVoiceStatus(`Built: ${presetId.replace(/-/g, ' ')}`)
-      void runLocalPreview(segments)
-    },
-    [canBuildPreview, runLocalPreview, videoDuration],
-  )
-
-  const runAutoPlanAndPreview = useCallback(() => {
-    if (!canBuildPreview) return
-    const d = Math.max(8, videoDuration)
-    const plan = orchestrateBrief(
-      {
-        objective: 'creator teaser flow',
-        tone: 'confident',
-        targetDurationSec: d,
-        platform: 'generic',
-      },
-      d,
-    )
-    const state = createInitialTimeline(d)
-    const ops = agentPlanToOperations(plan, 'main')
-    const next = applyOperations(state, ops)
-    const main = next.tracks[0]
-    const segments = main.clips.map((c) => ({
-      id: c.id,
-      startSec: c.startSec,
-      endSec: c.endSec,
-      source: c.source,
-      label: c.label,
-    }))
-    setTimelineSegments(segments)
-    setVoiceStatus(`Auto plan: ${plan.summary}`)
-    void runLocalPreview(segments)
-  }, [canBuildPreview, runLocalPreview, videoDuration])
-
-  const runPromptTeaserAndPreview = useCallback(() => {
-    if (!canBuildPreview) return
-    const segments = buildPresetSegments('teaser-fast-cuts', videoDuration)
-    setTimelineSegments(segments)
-    setVoiceStatus('Teaser (fast cuts)')
-    void runLocalPreview(segments)
-  }, [canBuildPreview, runLocalPreview, videoDuration])
 
   const executeEditPlan = useCallback(
     async (plan: MarkitEditPlanV1) => {
@@ -638,7 +583,7 @@ export function EditorApp() {
   }
 
   return (
-    <MarkitEditorView
+    <MarkitEditorV2
       creatixUrl={CREATIX}
       importUrl={importUrl}
       hasVaultSource={hasVaultBridge}
@@ -676,11 +621,6 @@ export function EditorApp() {
       onQuickAssist={(hint) => void runAssist(hint)}
       previewUrl={previewUrl}
       onClearPreview={clearPreview}
-      previewBusy={previewBusy}
-      canBuildPreview={canBuildPreview}
-      onRunPreset={runPresetAndPreview}
-      onRunAutoPlan={runAutoPlanAndPreview}
-      onRunPromptTeaser={runPromptTeaserAndPreview}
       ariadneBlock={ariadneBlock}
       pendingEditPlan={pendingEditPlan}
       onApplyAiEditPlan={() => void applyAiEditPlan()}
