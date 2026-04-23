@@ -27,6 +27,7 @@ import { createExportManifest } from '@/lib/editor/export-plan'
 import { createInitialTimeline } from '@/lib/editor/timeline-model'
 import { flagFramerTracedExport } from '@/lib/flags'
 import { isFullFrameCrop } from '@/lib/crop-utils'
+import { buildPresetSegments } from '@/lib/editor/preset-timeline'
 
 const CREATIX = process.env.NEXT_PUBLIC_CREATIX_APP_URL || 'https://www.circeetvenus.com'
 
@@ -215,11 +216,6 @@ export function EditorApp() {
 
   const presets = useMemo(() => (presetsData as { presets: Preset[] }).presets || [], [])
 
-  const insertPreset = (p: Preset) => {
-    const hint = `Preset "${p.label}": ${p.description}. Tags: ${p.tags.join(', ')}.`
-    void runAssist(hint)
-  }
-
   const handleChatSubmit = useCallback(() => {
     const t = chatInput.trim()
     if (!t || !canUseAi) return
@@ -235,6 +231,11 @@ export function EditorApp() {
   const [voiceStatus, setVoiceStatus] = useState<string | null>(null)
   const [voiceBusy, setVoiceBusy] = useState(false)
   const [cropRect, setCropRect] = useState({ x: 0, y: 0, width: 1, height: 1 })
+  const previewObjectUrlRef = useRef<string | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [previewBusy, setPreviewBusy] = useState(false)
+
+  const canBuildPreview = hasVaultBridge && Boolean(importUrl) && videoDuration > 0
 
   useEffect(() => {
     if (!contentId) {
@@ -253,7 +254,129 @@ export function EditorApp() {
     if (videoDuration <= 0) return
     setTimelineSegments((prev) => clampAllSegments(prev, videoDuration))
   }, [videoDuration])
+
+  useEffect(() => {
+    return () => {
+      if (previewObjectUrlRef.current) {
+        URL.revokeObjectURL(previewObjectUrlRef.current)
+        previewObjectUrlRef.current = null
+      }
+    }
+  }, [])
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  const clearPreview = useCallback(() => {
+    if (previewObjectUrlRef.current) {
+      URL.revokeObjectURL(previewObjectUrlRef.current)
+      previewObjectUrlRef.current = null
+    }
+    setPreviewUrl(null)
+  }, [])
+
+  const runLocalPreview = useCallback(
+    async (segments: TimelineSegment[]) => {
+      if (segments.length === 0) {
+        setExportStatus('Add clips or run a preset.')
+        return
+      }
+      if (!importUrl || !hasVaultBridge) {
+        setExportStatus('Open Markit from Media & vault to build a video preview.')
+        return
+      }
+      const d = videoDuration
+      if (!d || d <= 0) {
+        setExportStatus('Wait for the source video to load.')
+        return
+      }
+      setPreviewBusy(true)
+      setExportStatus('Rendering preview in your browser…')
+      try {
+        const plan = timelineToEditPlan(segments, 'markit-preview', cropRect)
+        const mergedCrop = plan.crop ?? cropRect
+        const effectivePlan: MarkitEditPlanV1 = {
+          ...plan,
+          crop: isFullFrameCrop(mergedCrop) ? undefined : mergedCrop,
+        }
+        setExportStatus('Loading video for preview…')
+        const pres = await fetch(importUrl, { method: 'GET', mode: 'cors' })
+        if (!pres.ok) throw new Error(`Could not read main video (${pres.status}).`)
+        const primaryBlob = await pres.blob()
+        setExportStatus('Rendering cuts in your browser…')
+        const out = await runMarkitEditPlan(primaryBlob, null, effectivePlan, (p) => {
+          if (p.message) setExportStatus(p.message)
+        })
+        if (previewObjectUrlRef.current) {
+          URL.revokeObjectURL(previewObjectUrlRef.current)
+          previewObjectUrlRef.current = null
+        }
+        const url = URL.createObjectURL(out)
+        previewObjectUrlRef.current = url
+        setPreviewUrl(url)
+        setExportStatus('Preview ready — press Play to watch your edit.')
+      } catch (e) {
+        console.error('[markit] preview render failed', e)
+        const message =
+          e instanceof Error
+            ? e.message
+            : typeof e === 'string'
+              ? e
+              : e && typeof e === 'object' && 'message' in e && typeof (e as { message: unknown }).message === 'string'
+                ? (e as { message: string }).message
+                : `Preview failed: ${String(e)}`
+        setExportStatus(message)
+      } finally {
+        setPreviewBusy(false)
+      }
+    },
+    [cropRect, hasVaultBridge, importUrl, videoDuration],
+  )
+
+  const runPresetAndPreview = useCallback(
+    (presetId: string) => {
+      if (!canBuildPreview) return
+      const segments = buildPresetSegments(presetId, videoDuration)
+      setTimelineSegments(segments)
+      setVoiceStatus(`Built: ${presetId.replace(/-/g, ' ')}`)
+      void runLocalPreview(segments)
+    },
+    [canBuildPreview, runLocalPreview, videoDuration],
+  )
+
+  const runAutoPlanAndPreview = useCallback(() => {
+    if (!canBuildPreview) return
+    const d = Math.max(8, videoDuration)
+    const plan = orchestrateBrief(
+      {
+        objective: 'creator teaser flow',
+        tone: 'confident',
+        targetDurationSec: d,
+        platform: 'generic',
+      },
+      d,
+    )
+    const state = createInitialTimeline(d)
+    const ops = agentPlanToOperations(plan, 'main')
+    const next = applyOperations(state, ops)
+    const main = next.tracks[0]
+    const segments = main.clips.map((c) => ({
+      id: c.id,
+      startSec: c.startSec,
+      endSec: c.endSec,
+      source: c.source,
+      label: c.label,
+    }))
+    setTimelineSegments(segments)
+    setVoiceStatus(`Auto plan: ${plan.summary}`)
+    void runLocalPreview(segments)
+  }, [canBuildPreview, runLocalPreview, videoDuration])
+
+  const runPromptTeaserAndPreview = useCallback(() => {
+    if (!canBuildPreview) return
+    const segments = buildPresetSegments('teaser-fast-cuts', videoDuration)
+    setTimelineSegments(segments)
+    setVoiceStatus('Teaser (fast cuts)')
+    void runLocalPreview(segments)
+  }, [canBuildPreview, runLocalPreview, videoDuration])
 
   const executeEditPlan = useCallback(
     async (plan: MarkitEditPlanV1) => {
@@ -326,33 +449,6 @@ export function EditorApp() {
     await executeEditPlan(plan)
   }, [cropRect, executeEditPlan, timelineSegments])
 
-  const applyAIAutoPlan = useCallback(() => {
-    const targetDuration = Math.max(15, Math.min(videoDuration || 30, 90))
-    const plan = orchestrateBrief(
-      {
-        objective: 'creator teaser flow',
-        tone: 'confident',
-        targetDurationSec: targetDuration,
-        platform: 'generic',
-      },
-      targetDuration,
-    )
-    const state = createInitialTimeline(targetDuration)
-    const ops = agentPlanToOperations(plan, 'main')
-    const next = applyOperations(state, ops)
-    const main = next.tracks[0]
-    setTimelineSegments(
-      main.clips.map((c) => ({
-        id: c.id,
-        startSec: c.startSec,
-        endSec: c.endSec,
-        source: c.source,
-        label: c.label,
-      })),
-    )
-    setVoiceStatus(`AI plan applied: ${plan.summary}`)
-  }, [videoDuration])
-
   const runVoiceCommand = useCallback(async () => {
     const transcript = voiceTranscript.trim()
     if (!transcript) return
@@ -378,9 +474,10 @@ export function EditorApp() {
         const count = Math.max(1, Math.min(8, Number(intent.count || 3)))
         const d = Math.max(6, Math.min(60, Number(intent.durationSec || 15)))
         const segs: TimelineSegment[] = []
+        const vd = Math.max(0.1, videoDuration)
         for (let i = 0; i < count; i++) {
-          const at = i * d
-          const clip = createClipAtPlayhead(Math.max(videoDuration, d * count + 1), at, d, 'primary')
+          const at = Math.min(i * d, Math.max(0, vd - d - 0.1))
+          const clip = createClipAtPlayhead(vd, at, d, 'primary')
           segs.push({
             id: clip.id,
             startSec: clip.startSec,
@@ -390,26 +487,32 @@ export function EditorApp() {
           })
         }
         setTimelineSegments(segs)
+        setVoiceStatus(data.confirmation || 'Rendering voice teasers…')
+        await runLocalPreview(segs)
       } else if (intent?.type === 'trim_window') {
         const seconds = Math.max(5, Math.min(120, Number(intent.seconds || 15)))
-        const end = Math.max(seconds, videoDuration || seconds)
-        setTimelineSegments([
+        const vd = videoDuration || seconds
+        const segs: TimelineSegment[] = [
           {
             id: crypto.randomUUID(),
             startSec: 0,
-            endSec: Math.min(end, seconds),
+            endSec: Math.min(vd, seconds),
             source: 'primary',
             label: `Voice trim ${seconds}s`,
           },
-        ])
+        ]
+        setTimelineSegments(segs)
+        setVoiceStatus(data.confirmation || 'Rendering trim…')
+        await runLocalPreview(segs)
+      } else {
+        setVoiceStatus(data.confirmation || 'Voice intent parsed')
       }
-      setVoiceStatus(data.confirmation || 'Voice intent parsed')
     } catch (error) {
       setVoiceStatus(error instanceof Error ? error.message : 'Voice command failed')
     } finally {
       setVoiceBusy(false)
     }
-  }, [videoDuration, voiceTranscript])
+  }, [runLocalPreview, videoDuration, voiceTranscript])
 
   const [recipientKey, setRecipientKey] = useState('')
   const [ariadneBusy, setAriadneBusy] = useState(false)
@@ -544,7 +647,10 @@ export function EditorApp() {
       exportBusy={exportBusy}
       canExport={canManualExport}
       onSendSourceToVault={() => void sendSourceToVault()}
-      onReplaceFile={(f) => void pushFile(f)}
+      onReplaceFile={(f) => {
+        clearPreview()
+        void pushFile(f)
+      }}
       exportStatus={exportStatus}
       trimPanel={
         importUrl && hasVaultBridge ? (
@@ -567,11 +673,14 @@ export function EditorApp() {
       aiBusy={aiBusy}
       aiError={aiError}
       presets={presets.map((p) => ({ id: p.id, label: p.label, description: p.description }))}
-      onPresetClick={(p) => {
-        const full = presets.find((x) => x.id === p.id)
-        if (full) insertPreset(full)
-      }}
       onQuickAssist={(hint) => void runAssist(hint)}
+      previewUrl={previewUrl}
+      onClearPreview={clearPreview}
+      previewBusy={previewBusy}
+      canBuildPreview={canBuildPreview}
+      onRunPreset={runPresetAndPreview}
+      onRunAutoPlan={runAutoPlanAndPreview}
+      onRunPromptTeaser={runPromptTeaserAndPreview}
       ariadneBlock={ariadneBlock}
       pendingEditPlan={pendingEditPlan}
       onApplyAiEditPlan={() => void applyAiEditPlan()}
@@ -585,7 +694,6 @@ export function EditorApp() {
       onVoiceRun={() => void runVoiceCommand()}
       voiceBusy={voiceBusy}
       voiceStatus={voiceStatus}
-      onApplyAIAutoPlan={applyAIAutoPlan}
       cropRect={cropRect}
       onCropRectChange={(next) => {
         const maxX = Math.max(0, 1 - next.width)

@@ -27,12 +27,11 @@ export type AgentPlan = {
  */
 export function orchestrateBrief(brief: CreativeBrief, durationSec: number): AgentPlan {
   const d = Math.max(8, Math.min(durationSec || brief.targetDurationSec || 30, 180))
-  const hookEnd = Math.min(8, d * 0.22)
-  const bodyEnd = Math.min(d - 2, d * 0.8)
+  const third = d / 3
   const cuts: AgentCutSuggestion[] = [
-    { startSec: 0, endSec: hookEnd, rationale: 'Hook opener', intensity: 'high' },
-    { startSec: Math.max(0, hookEnd - 1), endSec: bodyEnd, rationale: 'Body pacing', intensity: 'medium' },
-    { startSec: Math.max(0, bodyEnd - 2), endSec: d, rationale: 'CTA close', intensity: 'soft' },
+    { startSec: 0, endSec: third, rationale: 'Hook opener', intensity: 'high' },
+    { startSec: third, endSec: 2 * third, rationale: 'Body pacing', intensity: 'medium' },
+    { startSec: 2 * third, endSec: d, rationale: 'CTA close', intensity: 'soft' },
   ]
   return {
     summary: `Build a ${Math.round(d)}s ${brief.tone || 'confident'} narrative for ${brief.platform || 'generic'} audience.`,

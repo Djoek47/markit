@@ -28,7 +28,6 @@ export type MarkitEditorViewProps = {
   aiBusy: boolean
   aiError: string | null
   presets: { id: string; label: string; description: string }[]
-  onPresetClick: (p: { id: string; label: string; description: string }) => void
   onQuickAssist: (hint: string) => void
   pendingEditPlan: MarkitEditPlanV1 | null
   onApplyAiEditPlan: () => void
@@ -42,11 +41,18 @@ export type MarkitEditorViewProps = {
   onVoiceRun: () => void
   voiceBusy: boolean
   voiceStatus: string | null
-  onApplyAIAutoPlan: () => void
   timelineManifest: { revision: number; segmentChecksum: string }
   cropRect: { x: number; y: number; width: number; height: number }
   onCropRectChange: (next: { x: number; y: number; width: number; height: number }) => void
   ariadneBlock: ReactNode
+  /** Local blob URL of last rendered edit — Play previews this, not the raw import. */
+  previewUrl: string | null
+  onClearPreview: () => void
+  previewBusy: boolean
+  canBuildPreview: boolean
+  onRunPreset: (presetId: string) => void
+  onRunAutoPlan: () => void
+  onRunPromptTeaser: () => void
 }
 
 function formatTime(sec: number) {
@@ -110,7 +116,6 @@ export function MarkitEditorView({
   aiBusy,
   aiError,
   presets,
-  onPresetClick,
   onQuickAssist,
   pendingEditPlan,
   onApplyAiEditPlan,
@@ -124,11 +129,17 @@ export function MarkitEditorView({
   onVoiceRun,
   voiceBusy,
   voiceStatus,
-  onApplyAIAutoPlan,
   timelineManifest,
   cropRect,
   onCropRectChange,
   ariadneBlock,
+  previewUrl,
+  onClearPreview,
+  previewBusy,
+  canBuildPreview,
+  onRunPreset,
+  onRunAutoPlan,
+  onRunPromptTeaser,
 }: MarkitEditorViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const timelineRef = useRef<HTMLDivElement>(null)
@@ -140,11 +151,11 @@ export function MarkitEditorView({
     const v = videoRef.current
     if (!v) return
     const d = v.duration
-    if (Number.isFinite(d)) {
-      setDuration(d)
-      onVideoDuration(d)
-    }
-  }, [onVideoDuration])
+    if (!Number.isFinite(d)) return
+    setDuration(d)
+    // Do not push preview duration to parent — avoids clamping source timeline to output length
+    if (!previewUrl) onVideoDuration(d)
+  }, [onVideoDuration, previewUrl])
 
   const onTick = useCallback(() => {
     const v = videoRef.current
@@ -175,7 +186,7 @@ export function MarkitEditorView({
       v.removeEventListener('play', onPlay)
       v.removeEventListener('pause', onPause)
     }
-  }, [importUrl])
+  }, [importUrl, previewUrl])
 
   const seekFromTimeline = useCallback(
     (clientX: number) => {
@@ -194,8 +205,23 @@ export function MarkitEditorView({
   const exportDisabled =
     !canExport ||
     exportBusy ||
+    previewBusy ||
     timelineSegments.length === 0 ||
     (timelineSegments.some((s) => s.source === 'secondary') && !hasSecondaryImport)
+
+  const videoSrc = previewUrl || importUrl
+  const stripSegments =
+    previewUrl && duration > 0
+      ? [
+          {
+            id: 'preview-whole',
+            startSec: 0,
+            endSec: duration,
+            source: 'primary' as const,
+            label: 'Rendered output',
+          },
+        ]
+      : timelineSegments
 
   return (
     <div className="min-h-[100dvh] bg-[var(--background)] px-4 py-4 text-[var(--foreground)] md:px-6">
@@ -240,10 +266,19 @@ export function MarkitEditorView({
               />
               Import video
             </label>
+            {previewUrl ? (
+              <button
+                type="button"
+                onClick={onClearPreview}
+                className="rounded-full border border-amber-400/50 px-3 py-1.5 text-xs text-amber-200 hover:bg-amber-500/10"
+              >
+                Back to source
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={togglePlay}
-              disabled={!importUrl}
+              disabled={!videoSrc}
               className="rounded-full border border-[var(--border)] px-3 py-1.5 text-xs hover:bg-white/5 disabled:opacity-40"
             >
               {playing ? 'Pause' : 'Play'}
@@ -273,16 +308,23 @@ export function MarkitEditorView({
                 Open Markit from Media &amp; Vault on Circe et Venus, or import a local video.
               </p>
             ) : (
-              <video
-                ref={videoRef}
-                key={importUrl}
-                src={importUrl}
-                className="max-h-[62vh] w-full rounded-lg object-contain"
-                playsInline
-                onLoadedMetadata={onMeta}
-                onTimeUpdate={onTick}
-                onClick={togglePlay}
-              />
+              <>
+                {previewUrl ? (
+                  <p className="absolute left-3 top-3 rounded-lg bg-amber-500/20 px-2 py-1 text-[11px] text-amber-100">
+                    Playing rendered edit (not raw source)
+                  </p>
+                ) : null}
+                <video
+                  ref={videoRef}
+                  key={previewUrl || importUrl}
+                  src={videoSrc}
+                  className="max-h-[62vh] w-full rounded-lg object-contain"
+                  playsInline
+                  onLoadedMetadata={onMeta}
+                  onTimeUpdate={onTick}
+                  onClick={togglePlay}
+                />
+              </>
             )}
           </div>
 
@@ -297,11 +339,11 @@ export function MarkitEditorView({
           <TimelineClipsStrip
             duration={duration}
             currentTime={currentTime}
-            segments={timelineSegments}
+            segments={stripSegments}
             onSegmentsChange={onTimelineSegmentsChange}
             videoRef={videoRef}
             hasSecondaryImport={hasSecondaryImport}
-            disabled={!canExport || exportBusy}
+            disabled={!canExport || exportBusy || Boolean(previewUrl)}
             onSeek={(sec) => {
               const v = videoRef.current
               if (!v) return
@@ -372,13 +414,16 @@ export function MarkitEditorView({
 
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4">
             <h2 className="mb-2 text-sm font-semibold">AI + Divine voice</h2>
+            <p className="mb-1 text-[11px] text-[var(--muted-foreground)]">
+              Builds a real cut list, renders in-browser, then press Play to watch the result.
+            </p>
             <div className="mb-2 flex flex-wrap gap-1">
-              {presets.slice(0, 4).map((p) => (
+              {presets.map((p) => (
                 <button
                   key={p.id}
                   type="button"
-                  disabled={!canUseAi || aiBusy}
-                  onClick={() => onPresetClick(p)}
+                  disabled={!canBuildPreview || previewBusy || exportBusy}
+                  onClick={() => onRunPreset(p.id)}
                   className="rounded-full border border-[var(--border)] px-2 py-1 text-[11px] hover:bg-white/5 disabled:opacity-40"
                 >
                   {p.label}
@@ -386,16 +431,16 @@ export function MarkitEditorView({
               ))}
               <button
                 type="button"
-                disabled={!canUseAi || aiBusy}
-                onClick={onApplyAIAutoPlan}
+                disabled={!canBuildPreview || previewBusy || exportBusy}
+                onClick={onRunAutoPlan}
                 className="rounded-full border border-[var(--border)] px-2 py-1 text-[11px] hover:bg-white/5 disabled:opacity-40"
               >
                 Auto plan
               </button>
               <button
                 type="button"
-                disabled={!canUseAi || aiBusy}
-                onClick={() => onQuickAssist('Build a teaser cut with timestamps and a markit-edit block.')}
+                disabled={!canBuildPreview || previewBusy || exportBusy}
+                onClick={onRunPromptTeaser}
                 className="rounded-full border border-[var(--border)] px-2 py-1 text-[11px] hover:bg-white/5 disabled:opacity-40"
               >
                 Prompt teaser
