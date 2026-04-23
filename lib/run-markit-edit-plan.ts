@@ -1,5 +1,6 @@
 import type { MarkitEditPlanV1 } from '@/lib/markit-edit-plan'
 import { planNeedsSecondarySource } from '@/lib/markit-edit-plan'
+import { isFullFrameCrop } from '@/lib/crop-utils'
 import { concatMp4Blobs, cropVideoToMp4, trimVideoToMp4, type ComposeProgress } from '@/lib/ffmpeg-trim'
 
 /**
@@ -35,7 +36,8 @@ export async function runMarkitEditPlan(
       message: `Rendering cut ${i + 1}/${n}…`,
     })
     const trimmed = await trimVideoToMp4(blob, seg.startSec, seg.endSec, onProgress)
-    const rendered = plan.crop ? await cropVideoToMp4(trimmed, plan.crop, onProgress) : trimmed
+    const needCrop = plan.crop && !isFullFrameCrop(plan.crop)
+    const rendered = needCrop && plan.crop ? await cropVideoToMp4(trimmed, plan.crop, onProgress) : trimmed
     parts.push(rendered)
   }
 

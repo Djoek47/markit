@@ -1,4 +1,5 @@
 import type { MarkitEditPlanV1 } from '@/lib/markit-edit-plan'
+import { isFullFrameCrop } from '@/lib/crop-utils'
 
 export type TimelineSegmentSource = 'primary' | 'secondary'
 
@@ -57,7 +58,7 @@ export function timelineToEditPlan(
     version: 1,
     kind: 'concat_segments',
     label,
-    ...(crop ? { crop } : {}),
+    ...(crop && !isFullFrameCrop(crop) ? { crop } : {}),
     segments: segments.map((s) => ({
       startSec: s.startSec,
       endSec: s.endSec,

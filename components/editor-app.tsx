@@ -26,6 +26,7 @@ import { applyOperations, createClipAtPlayhead } from '@/lib/editor/edit-operati
 import { createExportManifest } from '@/lib/editor/export-plan'
 import { createInitialTimeline } from '@/lib/editor/timeline-model'
 import { flagFramerTracedExport } from '@/lib/flags'
+import { isFullFrameCrop } from '@/lib/crop-utils'
 
 const CREATIX = process.env.NEXT_PUBLIC_CREATIX_APP_URL || 'https://www.circeetvenus.com'
 
@@ -280,9 +281,10 @@ export function EditorApp() {
         }
 
         setExportStatus('Rendering cuts in your browser…')
+        const mergedCrop = plan.crop ?? cropRect
         const effectivePlan: MarkitEditPlanV1 = {
           ...plan,
-          crop: plan.crop ?? cropRect,
+          crop: isFullFrameCrop(mergedCrop) ? undefined : mergedCrop,
         }
 
         const out = await runMarkitEditPlan(primaryBlob, secondaryBlob, effectivePlan, (p) => {
@@ -294,8 +296,16 @@ export function EditorApp() {
         setExportStatus('Uploading to vault…')
         await postFileToVault(file)
       } catch (e) {
-        console.error('[markit] edit export failed', e instanceof Error ? e.message : e)
-        setExportStatus(e instanceof Error ? e.message : 'Export failed')
+        console.error('[markit] edit export failed', e)
+        const message =
+          e instanceof Error
+            ? e.message
+            : typeof e === 'string'
+              ? e
+              : e && typeof e === 'object' && 'message' in e && typeof (e as { message: unknown }).message === 'string'
+                ? (e as { message: string }).message
+                : `Export failed: ${String(e)}`
+        setExportStatus(message)
         setVaultUploadOk(false)
       } finally {
         setExportBusy(false)
