@@ -2,16 +2,16 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Studio shell — dark + purple accent (reference: Frame / Markit editor) */
+/* Hard-reset studio tokens: clean contrast, low visual noise. */
 :root {
-  --background: oklch(0.12 0.02 280);
-  --foreground: oklch(0.96 0.01 280);
-  --card: oklch(0.16 0.025 280);
+  --background: oklch(0.1 0.015 285);
+  --foreground: oklch(0.97 0.01 280);
+  --card: oklch(0.14 0.02 285);
   --card-foreground: oklch(0.96 0.01 280);
   --muted: oklch(0.22 0.02 280);
   --muted-foreground: oklch(0.62 0.02 280);
-  --border: oklch(0.28 0.03 280 / 0.55);
-  --studio-accent: oklch(0.58 0.24 290);
+  --border: oklch(0.28 0.02 280 / 0.6);
+  --studio-accent: oklch(0.62 0.23 292);
   --studio-accent-hover: oklch(0.52 0.24 290);
   --studio-accent-muted: oklch(0.58 0.24 290 / 0.25);
   --primary: oklch(0.58 0.24 290);
@@ -20,8 +20,8 @@
   --circe-light: oklch(0.72 0.16 295);
   --gold: oklch(0.78 0.14 85);
   --radius: 0.5rem;
-  --timeline-track: oklch(0.2 0.02 280);
-  --timeline-clip: oklch(0.45 0.12 290);
+  --timeline-track: oklch(0.19 0.02 282);
+  --timeline-clip: oklch(0.5 0.1 291);
 }
 
 html {
@@ -32,6 +32,7 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  min-height: 100dvh;
 }
 
 .font-serif-display {
@@ -41,8 +42,8 @@ body {
 /* Legacy utility used on sign-in */
 .bg-gradient-frame {
   background:
-    radial-gradient(ellipse 80% 50% at 50% -20%, oklch(0.55 0.2 295 / 0.12), transparent),
-    radial-gradient(ellipse 60% 40% at 100% 0%, oklch(0.58 0.24 290 / 0.08), transparent);
+    radial-gradient(ellipse 80% 50% at 50% -20%, oklch(0.55 0.2 295 / 0.1), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 0%, oklch(0.58 0.24 290 / 0.06), transparent);
 }
 
 .border-gold-edge {

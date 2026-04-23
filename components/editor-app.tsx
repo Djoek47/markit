@@ -233,6 +233,7 @@ export function EditorApp() {
   const [voiceTranscript, setVoiceTranscript] = useState('')
   const [voiceStatus, setVoiceStatus] = useState<string | null>(null)
   const [voiceBusy, setVoiceBusy] = useState(false)
+  const [cropRect, setCropRect] = useState({ x: 0, y: 0, width: 1, height: 1 })
 
   useEffect(() => {
     if (!contentId) {
@@ -279,10 +280,16 @@ export function EditorApp() {
         }
 
         setExportStatus('Rendering cuts in your browser…')
-        const out = await runMarkitEditPlan(primaryBlob, secondaryBlob, plan, (p) => {
+        const effectivePlan: MarkitEditPlanV1 = {
+          ...plan,
+          crop: plan.crop ?? cropRect,
+        }
+
+        const out = await runMarkitEditPlan(primaryBlob, secondaryBlob, effectivePlan, (p) => {
           if (p.message) setExportStatus(p.message)
         })
-        const baseName = (plan.label || 'markit-export').replace(/[^\w.-]+/g, '_').slice(0, 72) || 'markit-export'
+        const baseName =
+          (effectivePlan.label || 'markit-export').replace(/[^\w.-]+/g, '_').slice(0, 72) || 'markit-export'
         const file = new File([out], `${baseName}.mp4`, { type: 'video/mp4' })
         setExportStatus('Uploading to vault…')
         await postFileToVault(file)
@@ -294,7 +301,7 @@ export function EditorApp() {
         setExportBusy(false)
       }
     },
-    [hasSecondaryImport, hasVaultBridge, importUrl, importUrl2, postFileToVault],
+    [cropRect, hasSecondaryImport, hasVaultBridge, importUrl, importUrl2, postFileToVault],
   )
 
   const applyAiEditPlan = useCallback(async () => {
@@ -305,9 +312,9 @@ export function EditorApp() {
 
   const exportTimelineToVault = useCallback(async () => {
     if (timelineSegments.length === 0) return
-    const plan = timelineToEditPlan(timelineSegments, 'timeline-export')
+    const plan = timelineToEditPlan(timelineSegments, 'timeline-export', cropRect)
     await executeEditPlan(plan)
-  }, [executeEditPlan, timelineSegments])
+  }, [cropRect, executeEditPlan, timelineSegments])
 
   const applyAIAutoPlan = useCallback(() => {
     const targetDuration = Math.max(15, Math.min(videoDuration || 30, 90))
@@ -441,49 +448,35 @@ export function EditorApp() {
     setPaid(null)
   }, [])
 
-  const ariadneBlock = (
-    <div className="rounded-lg border border-[var(--border)] p-3">
-      <h3 className="mb-1 text-xs font-semibold">Ariadne trace</h3>
-      <p className="mb-2 text-[11px] leading-relaxed" style={{ color: 'var(--muted-foreground)' }}>
-        Optional marker on the vault file after upload (AI credits per Circe et Venus).
-      </p>
-      {hasVaultBridge && contentId ? (
-        <div className="space-y-2">
-          <label className="block text-[11px]">
-            <span style={{ color: 'var(--muted-foreground)' }}>Recipient key</span>
-            <input
-              value={recipientKey}
-              onChange={(e) => setRecipientKey(e.target.value)}
-              placeholder="e.g. fan handle"
-              className="mt-1 w-full rounded border border-[var(--border)] bg-black/30 px-2 py-1.5 text-xs"
-            />
-          </label>
-          <button
-            type="button"
-            disabled={ariadneBusy || !vaultUploadOk || !recipientKey.trim() || !exportToken}
-            onClick={() => void applyAriadne()}
-            className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-xs font-medium disabled:opacity-40"
-          >
-            {ariadneBusy ? 'Embedding…' : 'Embed marker'}
-          </button>
-          {!vaultUploadOk ? (
-            <p className="text-[10px]" style={{ color: 'var(--muted-foreground)' }}>
-              Upload or trim to vault first.
-            </p>
-          ) : null}
-          {ariadneMsg ? <p className="text-[10px]" style={{ color: 'var(--circe-light)' }}>{ariadneMsg}</p> : null}
-          {tracedExportEnabled ? (
-            <p className="text-[10px]" style={{ color: 'var(--muted-foreground)' }}>
-              Traced export mode enabled.
-            </p>
-          ) : null}
-        </div>
-      ) : (
-        <a href={`${CREATIX}/dashboard/ai-studio/ariadne`} className="text-[11px] underline" style={{ color: 'var(--studio-accent)' }}>
-          Open Ariadne on Circe et Venus
-        </a>
-      )}
+  const ariadneBlock = hasVaultBridge && contentId ? (
+    <div className="space-y-2 text-xs">
+      <p className="text-[var(--muted-foreground)]">Step 1: export to vault. Step 2: add recipient key. Step 3: trace.</p>
+      <label className="block">
+        <span className="text-[var(--muted-foreground)]">Recipient key</span>
+        <input
+          value={recipientKey}
+          onChange={(e) => setRecipientKey(e.target.value)}
+          placeholder="fan-handle or email hash"
+          className="mt-1 w-full rounded-lg border border-[var(--border)] bg-black/20 px-2 py-1.5 text-xs"
+        />
+      </label>
+      <button
+        type="button"
+        disabled={ariadneBusy || !vaultUploadOk || !recipientKey.trim() || !exportToken}
+        onClick={() => void applyAriadne()}
+        className="rounded-lg px-3 py-2 text-xs font-semibold text-[var(--primary-foreground)] disabled:opacity-40"
+        style={{ background: 'var(--studio-accent)' }}
+      >
+        {ariadneBusy ? 'Embedding marker…' : 'Embed Ariadne marker'}
+      </button>
+      {!vaultUploadOk ? <p className="text-[11px] text-[var(--muted-foreground)]">Export to vault first.</p> : null}
+      {ariadneMsg ? <p className="text-[11px] text-[var(--circe-light)]">{ariadneMsg}</p> : null}
+      {tracedExportEnabled ? <p className="text-[11px] text-[var(--muted-foreground)]">Traced export mode enabled.</p> : null}
     </div>
+  ) : (
+    <a href={`${CREATIX}/dashboard/ai-studio/ariadne`} className="text-xs underline text-[var(--studio-accent)]">
+      Open Ariadne on Circe et Venus
+    </a>
   )
 
   if (!hasVaultBridge && (!authReady || !entitlementReady)) {
@@ -583,6 +576,17 @@ export function EditorApp() {
       voiceBusy={voiceBusy}
       voiceStatus={voiceStatus}
       onApplyAIAutoPlan={applyAIAutoPlan}
+      cropRect={cropRect}
+      onCropRectChange={(next) => {
+        const maxX = Math.max(0, 1 - next.width)
+        const maxY = Math.max(0, 1 - next.height)
+        setCropRect({
+          x: Math.max(0, Math.min(maxX, next.x)),
+          y: Math.max(0, Math.min(maxY, next.y)),
+          width: Math.max(0.1, Math.min(1, next.width)),
+          height: Math.max(0.1, Math.min(1, next.height)),
+        })
+      }}
       timelineManifest={createExportManifest({
         durationSec: Math.max(0, videoDuration),
         revision: timelineSegments.length + 1,

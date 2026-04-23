@@ -179,3 +179,53 @@ export async function concatMp4Blobs(
 
 export type ComposeProgress = TrimProgress & { message?: string }
 
+/**
+ * Crop a video blob using normalized coordinates (0..1).
+ * Uses ffmpeg expressions against source dimensions for reliable browser-side processing.
+ */
+export async function cropVideoToMp4(
+  inputBlob: Blob,
+  crop: { x: number; y: number; width: number; height: number },
+  onProgress?: (p: TrimProgress) => void,
+): Promise<Blob> {
+  onProgress?.({ stage: 'load', pct: 0, message: 'Loading ffmpeg for crop…' })
+  const { ffmpeg, fetchFile } = await getFfmpeg()
+  onProgress?.({ stage: 'load', pct: 100 })
+
+  const inputName = 'crop-input.bin'
+  const outName = 'crop-out.mp4'
+  await ffmpeg.deleteFile(outName).catch(() => {})
+  await ffmpeg.writeFile(inputName, await fetchFile(inputBlob))
+
+  const x = Math.max(0, Math.min(1, crop.x))
+  const y = Math.max(0, Math.min(1, crop.y))
+  const w = Math.max(0.05, Math.min(1, crop.width))
+  const h = Math.max(0.05, Math.min(1, crop.height))
+  const vf = `crop=iw*${w}:ih*${h}:iw*${x}:ih*${y}`
+
+  onProgress?.({ stage: 'run', pct: 10, message: 'Applying crop…' })
+  await ffmpeg.exec([
+    '-i',
+    inputName,
+    '-vf',
+    vf,
+    '-c:v',
+    'libx264',
+    '-preset',
+    'veryfast',
+    '-crf',
+    '23',
+    '-c:a',
+    'aac',
+    '-b:a',
+    '128k',
+    '-movflags',
+    '+faststart',
+    outName,
+  ])
+  onProgress?.({ stage: 'run', pct: 95 })
+  const raw = await ffmpeg.readFile(outName)
+  if (!(raw instanceof Uint8Array)) throw new Error('Unexpected ffmpeg crop output')
+  return new Blob([Uint8Array.from(raw)], { type: 'video/mp4' })
+}
+

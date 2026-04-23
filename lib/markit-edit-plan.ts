@@ -10,6 +10,13 @@ export type MarkitEditPlanV1 = {
   /** concat_segments = default; side_by_side reserved for future (requires different ffmpeg graph) */
   kind?: 'concat_segments' | 'side_by_side'
   label?: string
+  /** Optional global crop rectangle applied to all rendered segments (normalized 0..1). */
+  crop?: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }
   segments: {
     startSec: number
     endSec: number
@@ -68,10 +75,32 @@ export function parseMarkitEditPlanJson(raw: string): MarkitEditPlanV1 | null {
     const kind = o.kind
     if (kind !== undefined && kind !== 'concat_segments' && kind !== 'side_by_side') return null
 
+    const cropRaw = o.crop as Record<string, unknown> | undefined
+    let crop: MarkitEditPlanV1['crop'] | undefined
+    if (cropRaw) {
+      const x = Number(cropRaw.x)
+      const y = Number(cropRaw.y)
+      const width = Number(cropRaw.width)
+      const height = Number(cropRaw.height)
+      const valid =
+        Number.isFinite(x) &&
+        Number.isFinite(y) &&
+        Number.isFinite(width) &&
+        Number.isFinite(height) &&
+        x >= 0 &&
+        y >= 0 &&
+        width > 0 &&
+        height > 0 &&
+        x + width <= 1 &&
+        y + height <= 1
+      if (valid) crop = { x, y, width, height }
+    }
+
     return {
       version: 1,
       kind: kind as MarkitEditPlanV1['kind'],
       label: typeof o.label === 'string' ? o.label : undefined,
+      ...(crop ? { crop } : {}),
       segments,
     }
   } catch {

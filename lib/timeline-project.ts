@@ -48,11 +48,16 @@ export function saveTimelineToStorage(contentId: string | null, segments: Timeli
 }
 
 /** Map UI segments to a v1 edit plan (same executor as Assist `markit-edit`). */
-export function timelineToEditPlan(segments: TimelineSegment[], label = 'timeline-export'): MarkitEditPlanV1 {
+export function timelineToEditPlan(
+  segments: TimelineSegment[],
+  label = 'timeline-export',
+  crop?: MarkitEditPlanV1['crop'],
+): MarkitEditPlanV1 {
   return {
     version: 1,
     kind: 'concat_segments',
     label,
+    ...(crop ? { crop } : {}),
     segments: segments.map((s) => ({
       startSec: s.startSec,
       endSec: s.endSec,

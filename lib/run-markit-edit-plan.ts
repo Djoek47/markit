@@ -1,6 +1,6 @@
 import type { MarkitEditPlanV1 } from '@/lib/markit-edit-plan'
 import { planNeedsSecondarySource } from '@/lib/markit-edit-plan'
-import { concatMp4Blobs, trimVideoToMp4, type ComposeProgress } from '@/lib/ffmpeg-trim'
+import { concatMp4Blobs, cropVideoToMp4, trimVideoToMp4, type ComposeProgress } from '@/lib/ffmpeg-trim'
 
 /**
  * Execute a v1 plan in the browser: trims + concat. Multi-angle needs both blobs when segments use `secondary`.
@@ -34,7 +34,9 @@ export async function runMarkitEditPlan(
       pct: Math.round(((i + 0.5) / n) * 85),
       message: `Rendering cut ${i + 1}/${n}…`,
     })
-    parts.push(await trimVideoToMp4(blob, seg.startSec, seg.endSec, onProgress))
+    const trimmed = await trimVideoToMp4(blob, seg.startSec, seg.endSec, onProgress)
+    const rendered = plan.crop ? await cropVideoToMp4(trimmed, plan.crop, onProgress) : trimmed
+    parts.push(rendered)
   }
 
   onProgress?.({ stage: 'run', pct: 88, message: 'Joining clips…' })
