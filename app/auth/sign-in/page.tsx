@@ -49,7 +49,7 @@ export default function SignInPage() {
           CIRCE ET VENUS
         </h1>
         <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
-          Markit — video editor
+          Markit — video editor (beta)
         </p>
       </div>
 

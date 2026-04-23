@@ -384,8 +384,11 @@ export function EditorApp() {
 
   if (!hasVaultBridge && (!authReady || !entitlementReady)) {
     return (
-      <div className="flex min-h-[100dvh] items-center justify-center bg-[var(--background)] px-4 text-sm" style={{ color: 'var(--muted-foreground)' }}>
-        Loading…
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-[var(--background)] px-4 text-sm" style={{ color: 'var(--muted-foreground)' }}>
+        <p>Loading…</p>
+        <p className="mt-6 text-xs" style={{ color: 'var(--muted-foreground)' }}>
+          Markit video editor is in beta.
+        </p>
       </div>
     )
   }
@@ -416,6 +419,9 @@ export function EditorApp() {
               Manage subscription
             </a>
           </div>
+          <p className="mt-10 text-xs" style={{ color: 'var(--muted-foreground)' }}>
+            Markit video editor is in beta — features may change.
+          </p>
         </div>
       </div>
     )

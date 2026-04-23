@@ -17,8 +17,9 @@ const dmSans = DM_Sans({
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Markit — Circe et Venus',
-  description: 'Video editor for vault assets — trim, export, AI assist, Ariadne Trace.',
+  title: 'Markit (Beta) — Circe et Venus',
+  description:
+    'Beta video editor for vault assets — trim, export, AI assist, Ariadne Trace. Features and behavior may change.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

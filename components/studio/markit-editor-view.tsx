@@ -215,6 +215,19 @@ export function MarkitEditorView({
         </div>
       </header>
 
+      <div
+        className="shrink-0 border-b border-[var(--border)] px-3 py-1.5 text-center text-[11px] leading-snug md:px-4 md:text-left"
+        style={{ background: 'var(--studio-accent-muted)', color: 'var(--muted-foreground)' }}
+        role="status"
+      >
+        <strong style={{ color: 'var(--foreground)' }}>Beta —</strong> This video editor is still in development.
+        Features, export quality, and performance may change. Report issues from{' '}
+        <a href={`${creatixUrl}/dashboard/ai-studio`} className="underline" style={{ color: 'var(--studio-accent)' }}>
+          AI Studio
+        </a>{' '}
+        / your usual Circe et Venus support channels.
+      </div>
+
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         {/* Media library */}
         <aside

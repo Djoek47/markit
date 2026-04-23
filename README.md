@@ -1,6 +1,6 @@
 # Markit
 
-Standalone **Circe et Venus** video editor: trim in the browser (ffmpeg.wasm), upload back to the vault, **Markit Assist** (AI), and optional **Ariadne Trace** embed — deployed separately from [Creatix](https://github.com/Djoek47/Creatix).
+**Beta** — standalone **Circe et Venus** video editor: trim in the browser (ffmpeg.wasm), upload back to the vault, **Markit Assist** (AI), and optional **Ariadne Trace** embed — deployed separately from [Creatix](https://github.com/Djoek47/Creatix). Expect ongoing changes until we leave beta.
 
 **Architecture (Mermaid):** [docs/ECOSYSTEM_ARCHITECTURE.md](docs/ECOSYSTEM_ARCHITECTURE.md) — Markit ↔ Creatix APIs, wasm, optional worker render, Ariadne.
 
