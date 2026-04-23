@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sendTraceToCreatix } from '@/lib/ariadne/authority-client'
 
 /**
  * Forwards Ariadne embed to Creatix with the same auth the browser would send,
@@ -20,17 +21,32 @@ export async function POST(req: NextRequest) {
   const auth = req.headers.get('authorization')
   const cookie = req.headers.get('cookie')
 
-  const upstream = await fetch(`${creatix}/api/ariadne/embed`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(auth ? { Authorization: auth } : {}),
-      ...(cookie ? { Cookie: cookie } : {}),
-    },
-    body: JSON.stringify(body),
-  })
+  const upstream = await sendTraceToCreatix(creatix, body as {
+    contentId: string
+    recipientKey: string
+    source: 'vault_standalone' | 'frame_export' | 'message_send' | 'mass_dm'
+    lineage?: { jobId?: string; pipelineVersion?: string; encoderProfile?: string }
+  }, auth)
 
-  const text = await upstream.text()
-  const ct = upstream.headers.get('content-type') || 'application/json'
-  return new NextResponse(text, { status: upstream.status, headers: { 'Content-Type': ct } })
+  if (!auth && cookie) {
+    // Preserve legacy cookie-based compatibility by replaying through direct proxy if needed.
+    const fallback = await fetch(`${creatix}/api/ariadne/embed`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: cookie,
+      },
+      body: JSON.stringify(body),
+    })
+    const fallbackText = await fallback.text()
+    const fallbackType = fallback.headers.get('content-type') || 'application/json'
+    if (fallback.status < 500) {
+      return new NextResponse(fallbackText, { status: fallback.status, headers: { 'Content-Type': fallbackType } })
+    }
+  }
+
+  return new NextResponse(upstream.text, {
+    status: upstream.status,
+    headers: { 'Content-Type': upstream.contentType },
+  })
 }

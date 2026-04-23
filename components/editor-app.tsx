@@ -20,6 +20,12 @@ import {
   timelineToEditPlan,
 } from '@/lib/timeline-project'
 import type { TimelineSegment } from '@/lib/timeline-project'
+import { orchestrateBrief } from '@/lib/agents/orchestrator'
+import { agentPlanToOperations } from '@/lib/agents/plans-to-timeline'
+import { applyOperations, createClipAtPlayhead } from '@/lib/editor/edit-operations'
+import { createExportManifest } from '@/lib/editor/export-plan'
+import { createInitialTimeline } from '@/lib/editor/timeline-model'
+import { flagFramerTracedExport } from '@/lib/flags'
 
 const CREATIX = process.env.NEXT_PUBLIC_CREATIX_APP_URL || 'https://www.circeetvenus.com'
 
@@ -61,6 +67,7 @@ export function EditorApp() {
     return () => subscription.unsubscribe()
   }, [])
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!authReady) return
     if (!sessionUserId) {
@@ -80,6 +87,7 @@ export function EditorApp() {
         setEntitlementReady(true)
       })
   }, [authReady, sessionUserId])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const [exportStatus, setExportStatus] = useState<string | null>(null)
   const [exportBusy, setExportBusy] = useState(false)
@@ -153,6 +161,7 @@ export function EditorApp() {
   const [chatInput, setChatInput] = useState('')
   const [chatMessages, setChatMessages] = useState<{ id: string; role: 'user' | 'assistant'; text: string }[]>([])
   const chatMessagesRef = useRef(chatMessages)
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     chatMessagesRef.current = chatMessages
   }, [chatMessages])
@@ -221,6 +230,9 @@ export function EditorApp() {
 
   const [timelineSegments, setTimelineSegments] = useState<TimelineSegment[]>([])
   const [videoDuration, setVideoDuration] = useState(0)
+  const [voiceTranscript, setVoiceTranscript] = useState('')
+  const [voiceStatus, setVoiceStatus] = useState<string | null>(null)
+  const [voiceBusy, setVoiceBusy] = useState(false)
 
   useEffect(() => {
     if (!contentId) {
@@ -239,6 +251,7 @@ export function EditorApp() {
     if (videoDuration <= 0) return
     setTimelineSegments((prev) => clampAllSegments(prev, videoDuration))
   }, [videoDuration])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const executeEditPlan = useCallback(
     async (plan: MarkitEditPlanV1) => {
@@ -296,9 +309,95 @@ export function EditorApp() {
     await executeEditPlan(plan)
   }, [executeEditPlan, timelineSegments])
 
+  const applyAIAutoPlan = useCallback(() => {
+    const targetDuration = Math.max(15, Math.min(videoDuration || 30, 90))
+    const plan = orchestrateBrief(
+      {
+        objective: 'creator teaser flow',
+        tone: 'confident',
+        targetDurationSec: targetDuration,
+        platform: 'generic',
+      },
+      targetDuration,
+    )
+    const state = createInitialTimeline(targetDuration)
+    const ops = agentPlanToOperations(plan, 'main')
+    const next = applyOperations(state, ops)
+    const main = next.tracks[0]
+    setTimelineSegments(
+      main.clips.map((c) => ({
+        id: c.id,
+        startSec: c.startSec,
+        endSec: c.endSec,
+        source: c.source,
+        label: c.label,
+      })),
+    )
+    setVoiceStatus(`AI plan applied: ${plan.summary}`)
+  }, [videoDuration])
+
+  const runVoiceCommand = useCallback(async () => {
+    const transcript = voiceTranscript.trim()
+    if (!transcript) return
+    setVoiceBusy(true)
+    setVoiceStatus(null)
+    try {
+      const res = await fetch('/api/divine/voice-edit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string
+        intent?: { type?: string; seconds?: number; durationSec?: number; count?: number }
+        confirmation?: string
+      }
+      if (!res.ok) {
+        setVoiceStatus(data.error || 'Voice command failed')
+        return
+      }
+      const intent = data.intent
+      if (intent?.type === 'make_teasers') {
+        const count = Math.max(1, Math.min(8, Number(intent.count || 3)))
+        const d = Math.max(6, Math.min(60, Number(intent.durationSec || 15)))
+        const segs: TimelineSegment[] = []
+        for (let i = 0; i < count; i++) {
+          const at = i * d
+          const clip = createClipAtPlayhead(Math.max(videoDuration, d * count + 1), at, d, 'primary')
+          segs.push({
+            id: clip.id,
+            startSec: clip.startSec,
+            endSec: clip.endSec,
+            source: clip.source,
+            label: clip.label,
+          })
+        }
+        setTimelineSegments(segs)
+      } else if (intent?.type === 'trim_window') {
+        const seconds = Math.max(5, Math.min(120, Number(intent.seconds || 15)))
+        const end = Math.max(seconds, videoDuration || seconds)
+        setTimelineSegments([
+          {
+            id: crypto.randomUUID(),
+            startSec: 0,
+            endSec: Math.min(end, seconds),
+            source: 'primary',
+            label: `Voice trim ${seconds}s`,
+          },
+        ])
+      }
+      setVoiceStatus(data.confirmation || 'Voice intent parsed')
+    } catch (error) {
+      setVoiceStatus(error instanceof Error ? error.message : 'Voice command failed')
+    } finally {
+      setVoiceBusy(false)
+    }
+  }, [videoDuration, voiceTranscript])
+
   const [recipientKey, setRecipientKey] = useState('')
   const [ariadneBusy, setAriadneBusy] = useState(false)
   const [ariadneMsg, setAriadneMsg] = useState<string | null>(null)
+  const tracedExportEnabled = flagFramerTracedExport()
 
   const applyAriadne = useCallback(async () => {
     if (!contentId || !exportToken || !recipientKey.trim()) {
@@ -373,6 +472,11 @@ export function EditorApp() {
             </p>
           ) : null}
           {ariadneMsg ? <p className="text-[10px]" style={{ color: 'var(--circe-light)' }}>{ariadneMsg}</p> : null}
+          {tracedExportEnabled ? (
+            <p className="text-[10px]" style={{ color: 'var(--muted-foreground)' }}>
+              Traced export mode enabled.
+            </p>
+          ) : null}
         </div>
       ) : (
         <a href={`${CREATIX}/dashboard/ai-studio/ariadne`} className="text-[11px] underline" style={{ color: 'var(--studio-accent)' }}>
@@ -473,6 +577,29 @@ export function EditorApp() {
       onTimelineSegmentsChange={setTimelineSegments}
       onExportTimeline={() => void exportTimelineToVault()}
       onVideoDuration={setVideoDuration}
+      voiceTranscript={voiceTranscript}
+      onVoiceTranscriptChange={setVoiceTranscript}
+      onVoiceRun={() => void runVoiceCommand()}
+      voiceBusy={voiceBusy}
+      voiceStatus={voiceStatus}
+      onApplyAIAutoPlan={applyAIAutoPlan}
+      timelineManifest={createExportManifest({
+        durationSec: Math.max(0, videoDuration),
+        revision: timelineSegments.length + 1,
+        tracks: [
+          {
+            id: 'main',
+            name: 'Main Track',
+            clips: timelineSegments.map((s) => ({
+              id: s.id,
+              source: s.source ?? 'primary',
+              startSec: s.startSec,
+              endSec: s.endSec,
+              label: s.label,
+            })),
+          },
+        ],
+      })}
     />
   )
 }

@@ -6,7 +6,8 @@
     "dev": "next dev -p 3020",
     "build": "next build --webpack",
     "start": "next start -p 3020",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:forensics-benchmark": "tsx scripts/forensics-benchmark.ts"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",
@@ -26,6 +27,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",
+    "tsx": "^4.20.6",
     "typescript": "^5"
   }
 }

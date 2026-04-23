@@ -1,0 +1,45 @@
+export type CreativeBrief = {
+  objective: string
+  tone?: string
+  targetDurationSec?: number
+  style?: string
+  platform?: 'of' | 'fansly' | 'generic'
+}
+
+export type AgentCutSuggestion = {
+  startSec: number
+  endSec: number
+  rationale: string
+  intensity: 'soft' | 'medium' | 'high'
+}
+
+export type AgentPlan = {
+  summary: string
+  hook: string
+  body: string
+  cta: string
+  cuts: AgentCutSuggestion[]
+}
+
+/**
+ * Multi-agent style orchestration collapsed into deterministic local planner.
+ * This keeps behavior predictable while providing narrative-level output.
+ */
+export function orchestrateBrief(brief: CreativeBrief, durationSec: number): AgentPlan {
+  const d = Math.max(8, Math.min(durationSec || brief.targetDurationSec || 30, 180))
+  const hookEnd = Math.min(8, d * 0.22)
+  const bodyEnd = Math.min(d - 2, d * 0.8)
+  const cuts: AgentCutSuggestion[] = [
+    { startSec: 0, endSec: hookEnd, rationale: 'Hook opener', intensity: 'high' },
+    { startSec: Math.max(0, hookEnd - 1), endSec: bodyEnd, rationale: 'Body pacing', intensity: 'medium' },
+    { startSec: Math.max(0, bodyEnd - 2), endSec: d, rationale: 'CTA close', intensity: 'soft' },
+  ]
+  return {
+    summary: `Build a ${Math.round(d)}s ${brief.tone || 'confident'} narrative for ${brief.platform || 'generic'} audience.`,
+    hook: 'Open with highest tension shot and immediate emotional anchor.',
+    body: 'Maintain rhythm with quick contrast cuts and clear progression.',
+    cta: 'Close with a direct invitation to continue in DM/PPV flow.',
+    cuts,
+  }
+}
+

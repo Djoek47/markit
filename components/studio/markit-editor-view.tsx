@@ -44,6 +44,14 @@ export type MarkitEditorViewProps = {
   onTimelineSegmentsChange: (segments: TimelineSegment[]) => void
   onExportTimeline: () => void
   onVideoDuration: (sec: number) => void
+  /** Voice-first Divine editing */
+  voiceTranscript: string
+  onVoiceTranscriptChange: (v: string) => void
+  onVoiceRun: () => void
+  voiceBusy: boolean
+  voiceStatus: string | null
+  onApplyAIAutoPlan: () => void
+  timelineManifest: { revision: number; segmentChecksum: string }
   /** Ariadne */
   ariadneBlock: ReactNode
 }
@@ -84,6 +92,13 @@ export function MarkitEditorView({
   onTimelineSegmentsChange,
   onExportTimeline,
   onVideoDuration,
+  voiceTranscript,
+  onVoiceTranscriptChange,
+  onVoiceRun,
+  voiceBusy,
+  voiceStatus,
+  onApplyAIAutoPlan,
+  timelineManifest,
   ariadneBlock,
 }: MarkitEditorViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -526,6 +541,40 @@ export function MarkitEditorView({
                     </button>
                   ))}
                 </div>
+                <div className="rounded-lg border border-[var(--border)] p-2">
+                  <p className="mb-1 text-[10px] font-medium" style={{ color: 'var(--studio-accent)' }}>
+                    Divine voice-first
+                  </p>
+                  <div className="flex gap-1">
+                    <input
+                      value={voiceTranscript}
+                      onChange={(e) => onVoiceTranscriptChange(e.target.value)}
+                      placeholder='\"Cut hottest 15s and make 3 teasers\"'
+                      className="min-w-0 flex-1 rounded border border-[var(--border)] bg-black/30 px-2 py-1 text-[10px]"
+                    />
+                    <button
+                      type="button"
+                      onClick={onVoiceRun}
+                      disabled={voiceBusy || !voiceTranscript.trim()}
+                      className="rounded px-2 py-1 text-[10px] font-medium disabled:opacity-40"
+                      style={{ background: 'var(--studio-accent)', color: 'var(--primary-foreground)' }}
+                    >
+                      {voiceBusy ? '...' : 'Run'}
+                    </button>
+                  </div>
+                  {voiceStatus ? (
+                    <p className="mt-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>
+                      {voiceStatus}
+                    </p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={onApplyAIAutoPlan}
+                  className="w-full rounded-lg border border-[var(--border)] py-2 text-xs hover:bg-white/5"
+                >
+                  Build AI auto-plan
+                </button>
                 {trimPanel}
               </>
             )}
@@ -553,6 +602,9 @@ export function MarkitEditorView({
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-[10px]" style={{ color: 'var(--muted-foreground)' }}>
               {formatTime(currentTime)} / {formatTime(duration)}
+            </span>
+            <span className="font-mono text-[10px]" style={{ color: 'var(--muted-foreground)' }}>
+              rev {timelineManifest.revision} · {timelineManifest.segmentChecksum.slice(0, 8)}
             </span>
             {importUrl ? (
               <button
