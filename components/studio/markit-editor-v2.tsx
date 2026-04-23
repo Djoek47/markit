@@ -17,6 +17,43 @@ type LibraryItem = {
   importedAt: string
 }
 
+type TrackKind = 'video' | 'audio' | 'overlay'
+
+type TimelineTrack = {
+  id: 'v2' | 'v1' | 'a1' | 'ov'
+  kind: TrackKind
+  label: string
+  height: number
+  visible: boolean
+  locked: boolean
+  muted: boolean
+  proOnly?: boolean
+}
+
+type TimelineClip = {
+  id: string
+  trackId: TimelineTrack['id']
+  mediaId: string
+  start: number
+  in: number
+  out: number
+  volume: number
+  opacity: number
+  speed: number
+  fadeInMs: number
+  fadeOutMs: number
+  source: 'primary' | 'secondary'
+  label?: string
+}
+
+type TimelineModel = {
+  id: string
+  duration: number
+  tracks: TimelineTrack[]
+  clips: TimelineClip[]
+  pxPerSecond: number
+}
+
 export type MarkitEditorV2Props = {
   creatixUrl: string
   importUrl: string
@@ -120,6 +157,42 @@ function IconFilm() {
   )
 }
 
+const TRACK_DEFS: TimelineTrack[] = [
+  { id: 'v2', kind: 'video', label: 'V2', height: 32, visible: true, locked: false, muted: false, proOnly: true },
+  { id: 'v1', kind: 'video', label: 'V1', height: 32, visible: true, locked: false, muted: false },
+  { id: 'a1', kind: 'audio', label: 'A1', height: 32, visible: true, locked: false, muted: false },
+  { id: 'ov', kind: 'overlay', label: 'OV', height: 32, visible: true, locked: false, muted: false, proOnly: true },
+]
+
+function toTimelineClip(seg: TimelineSegment): TimelineClip {
+  return {
+    id: seg.id,
+    trackId: 'v1',
+    mediaId: 'vault-primary',
+    start: seg.startSec,
+    in: seg.startSec,
+    out: seg.endSec,
+    volume: 1,
+    opacity: 1,
+    speed: 1,
+    fadeInMs: 0,
+    fadeOutMs: 0,
+    source: seg.source === 'secondary' ? 'secondary' : 'primary',
+    label: seg.label,
+  }
+}
+
+function clipToSegment(clip: TimelineClip): TimelineSegment {
+  const span = Math.max(0.05, clip.out - clip.in)
+  return {
+    id: clip.id,
+    startSec: Math.max(0, clip.start),
+    endSec: Math.max(clip.start + 0.05, clip.start + span),
+    source: clip.source,
+    label: clip.label,
+  }
+}
+
 export function MarkitEditorV2(props: MarkitEditorV2Props) {
   const {
     creatixUrl,
@@ -165,10 +238,11 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
   const [density, setDensity] = useState<'simple' | 'pro'>('simple')
   const [tab, setTab] = useState<InspectorTab>('clip')
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null)
-  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null)
+  const [selectedMediaIds, setSelectedMediaIds] = useState<Set<string>>(new Set())
   const [libraryQuery, setLibraryQuery] = useState('')
   const [libraryKind, setLibraryKind] = useState<'all' | 'video' | 'audio' | 'image'>('all')
   const [libraryImports, setLibraryImports] = useState<LibraryItem[]>([])
+  const [auxClips, setAuxClips] = useState<TimelineClip[]>([])
   const [divineOpen, setDivineOpen] = useState(false)
   const [micHolding, setMicHolding] = useState(false)
   const [playing, setPlaying] = useState(false)
@@ -210,7 +284,9 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
       if (divineOpen && e.code === 'Space') {
         e.preventDefault()
         setMicHolding(false)
-        if (voiceTranscript.trim()) onVoiceRun()
+        const transcript = voiceTranscript.trim()
+        if (transcript) onQuickAssist(transcript)
+        else onVoiceRun()
       }
     }
     window.addEventListener('keydown', onKey)
@@ -219,7 +295,7 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [divineOpen, onVoiceRun, voiceTranscript])
+  }, [divineOpen, onQuickAssist, onVoiceRun, voiceTranscript])
 
   const filteredLibrary = useMemo(
     () =>
@@ -231,14 +307,55 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
     [library, libraryKind, libraryQuery],
   )
 
-  const selectedClip = timelineSegments.find((x) => x.id === selectedClipId) || null
   const videoSrc = previewUrl || importUrl
+
+  const timeline = useMemo<TimelineModel>(() => {
+    const v1Clips = timelineSegments.map(toTimelineClip)
+    const allClips = [...auxClips, ...v1Clips]
+    const rightMost = allClips.reduce((max, clip) => Math.max(max, clip.start + Math.max(0.05, clip.out - clip.in)), 0)
+    return {
+      id: 'main',
+      duration: Math.max(duration || 0, rightMost || 0),
+      tracks: TRACK_DEFS,
+      clips: allClips,
+      pxPerSecond: 40,
+    }
+  }, [auxClips, duration, timelineSegments])
+
+  const selectedClip = timeline.clips.find((x) => x.id === selectedClipId) || null
+
+  const setV1Clips = useCallback(
+    (clips: TimelineClip[]) => {
+      onTimelineSegmentsChange(
+        clips
+          .filter((clip) => clip.trackId === 'v1')
+          .sort((a, b) => a.start - b.start)
+          .map(clipToSegment),
+      )
+    },
+    [onTimelineSegmentsChange],
+  )
+
+  const upsertClip = useCallback(
+    (nextClip: TimelineClip) => {
+      if (nextClip.trackId === 'v1') {
+        const currentV1 = timeline.clips.filter((clip) => clip.trackId === 'v1' && clip.id !== nextClip.id)
+        setV1Clips([...currentV1, nextClip])
+      } else {
+        setAuxClips((prev) => {
+          const without = prev.filter((clip) => clip.id !== nextClip.id)
+          return [...without, nextClip]
+        })
+      }
+    },
+    [setV1Clips, timeline.clips],
+  )
 
   const exportDisabled =
     !canExport ||
     exportBusy ||
-    timelineSegments.length === 0 ||
-    (timelineSegments.some((s) => s.source === 'secondary') && !hasSecondaryImport)
+    timeline.clips.filter((clip) => clip.trackId === 'v1').length === 0 ||
+    timeline.clips.some((clip) => clip.source === 'secondary') && !hasSecondaryImport
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current
@@ -257,6 +374,56 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
   }, [duration])
 
   const playheadLeft = duration > 0 ? (currentTime / duration) * 100 : 0
+
+  useEffect(() => {
+    if (!importUrl) return
+    if (timelineSegments.length > 0) return
+    const span = Math.max(0.5, Math.min(5, duration || 5))
+    onTimelineSegmentsChange([
+      {
+        id: crypto.randomUUID(),
+        startSec: 0,
+        endSec: span,
+        source: 'primary',
+        label: 'Vault source',
+      },
+    ])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [importUrl, timelineSegments.length])
+
+  const toggleMediaSelection = (itemId: string, additive: boolean) => {
+    setSelectedMediaIds((prev) => {
+      const next = new Set(additive ? prev : [])
+      if (next.has(itemId)) next.delete(itemId)
+      else next.add(itemId)
+      return next
+    })
+  }
+
+  const commitDropToTrack = (trackId: TimelineTrack['id']) => {
+    const selected = selectedMediaIds.size ? Array.from(selectedMediaIds) : ['vault-primary']
+    if (!selected.length) return
+    const created = selected.map((mediaId, idx) => {
+      const start = Math.max(0, currentTime + idx * 0.2)
+      const span = Math.max(0.5, Math.min(5, timeline.duration || 5))
+      return {
+        id: crypto.randomUUID(),
+        trackId,
+        mediaId,
+        start,
+        in: start,
+        out: start + span,
+        volume: 1,
+        opacity: 1,
+        speed: 1,
+        fadeInMs: 0,
+        fadeOutMs: 0,
+        source: 'primary' as const,
+        label: `Clip ${timeline.clips.length + idx + 1}`,
+      }
+    })
+    created.forEach((clip) => upsertClip(clip))
+  }
 
   return (
     <div className="markit-shell grid h-dvh grid-rows-[52px_1fr_28px] overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
@@ -320,18 +487,18 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
                   role="button"
                   tabIndex={0}
                   draggable
-                  onClick={() => setSelectedMediaId(item.id)}
+                  onClick={(e) => toggleMediaSelection(item.id, e.metaKey || e.ctrlKey)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault()
-                      setSelectedMediaId(item.id)
+                      toggleMediaSelection(item.id, e.metaKey || e.ctrlKey)
                     }
                   }}
                   onDragStart={(e) => {
                     e.dataTransfer.setData('text/media-id', item.id)
                     e.dataTransfer.effectAllowed = 'copy'
                   }}
-                  className={`mk-media ${selectedMediaId === item.id ? 'mk-selected' : ''}`}
+                  className={`mk-media ${selectedMediaIds.has(item.id) ? 'mk-selected' : ''}`}
                 >
                   <div className="mk-thumb" aria-hidden />
                   <div className="min-w-0">
@@ -442,10 +609,10 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
                 <span className="mk-total">{fmt(duration)}</span>
               </div>
               <span className="simple-only font-mono-ui text-[9px] uppercase tracking-[0.18em] text-[var(--muted-faint)]">
-                {timelineSegments.length} clips
+                {timeline.clips.length} clips
               </span>
               <span className="pro-only font-mono-ui text-[9px] uppercase tracking-[0.18em] text-[var(--muted-faint)]">
-                fps — · {timelineSegments.length} clips
+                fps — · {timeline.clips.length} clips
               </span>
             </div>
 
@@ -461,14 +628,12 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
                 ))}
               </div>
               {[
-                { id: 'v2', label: 'V2', lane: 'video' as const, proOnly: true },
-                { id: 'v1', label: 'V1', lane: 'video' as const, proOnly: false },
-                { id: 'a1', label: 'A1', lane: 'audio' as const, proOnly: false },
-                { id: 'ov', label: 'OV', lane: 'overlay' as const, proOnly: true },
+                ...timeline.tracks,
               ].map((track) => {
                 const visible = !track.proOnly || density === 'pro'
                 if (!visible) return null
-                const swatch = track.lane === 'video' ? 'v' : track.lane === 'audio' ? 'a' : 'o'
+                const swatch = track.kind === 'video' ? 'v' : track.kind === 'audio' ? 'a' : 'o'
+                const trackClips = timeline.clips.filter((clip) => clip.trackId === track.id)
                 return (
                   <div key={track.id} className="mk-track">
                     <div className="mk-track-label">
@@ -480,51 +645,44 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={(e) => {
                         e.preventDefault()
-                        if (track.id !== 'v1') return
                         const mediaId = e.dataTransfer.getData('text/media-id')
-                        if (!mediaId) return
-                        const start = Math.max(0, currentTime)
-                        const end = start + Math.max(0.5, Math.min(5, duration || 5))
-                        onTimelineSegmentsChange([
-                          ...timelineSegments,
-                          {
-                            id: crypto.randomUUID(),
-                            startSec: start,
-                            endSec: end,
-                            source: 'primary',
-                            label: `Clip ${timelineSegments.length + 1}`,
-                          },
-                        ])
+                        if (mediaId) {
+                          setSelectedMediaIds(new Set([mediaId]))
+                        }
+                        commitDropToTrack(track.id)
                       }}
                     >
-                      {track.id === 'v1'
-                        ? timelineSegments.map((seg) => {
-                            const left = duration > 0 ? (seg.startSec / duration) * 100 : 0
-                            const width = duration > 0 ? ((seg.endSec - seg.startSec) / duration) * 100 : 10
+                      {trackClips.length
+                        ? trackClips.map((clip) => {
+                            const rightMost = Math.max(timeline.duration, 0.1)
+                            const left = (clip.start / rightMost) * 100
+                            const width = ((clip.out - clip.in) / rightMost) * 100
+                            const kindClass =
+                              track.kind === 'video' ? 'video' : track.kind === 'audio' ? 'audio' : 'overlay'
                             return (
                               <button
-                                key={seg.id}
+                                key={clip.id}
                                 type="button"
-                                onClick={() => setSelectedClipId(seg.id)}
-                                className={`mk-clip video ${seg.id === selectedClipId ? 'mk-selected' : ''}`}
+                                onClick={() => setSelectedClipId(clip.id)}
+                                className={`mk-clip ${kindClass} ${clip.id === selectedClipId ? 'mk-selected' : ''}`}
                                 style={{ left: `${left}%`, width: `${Math.max(width, 1)}%` }}
                               >
-                                <span className="truncate">{seg.label || 'clip'}</span>
+                                <span className="truncate">{clip.label || 'clip'}</span>
                               </button>
                             )
                           })
                         : null}
-                      {track.id === 'a1' ? (
+                      {track.id === 'a1' && trackClips.length === 0 ? (
                         <span className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-mono-ui text-[9px] uppercase tracking-widest text-[var(--muted-faint)]">
                           audio lane
                         </span>
                       ) : null}
-                      {track.id !== 'v1' && track.id !== 'a1' ? (
+                      {track.id !== 'v1' && track.id !== 'a1' && trackClips.length === 0 ? (
                         <span className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-mono-ui text-[9px] uppercase tracking-widest text-[var(--muted-faint)]">
                           drop zone
                         </span>
                       ) : null}
-                      {duration > 0 && track.id === 'v1' ? (
+                      {timeline.duration > 0 && track.id === 'v1' ? (
                         <div className="mk-playhead" style={{ left: `${playheadLeft}%` }} />
                       ) : null}
                     </div>
@@ -565,11 +723,9 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
                         <input
                           type="number"
                           step={0.1}
-                          value={Number(selectedClip.startSec.toFixed(2))}
+                          value={Number(selectedClip.start.toFixed(2))}
                           onChange={(e) =>
-                            onTimelineSegmentsChange(
-                              timelineSegments.map((x) => (x.id === selectedClip.id ? { ...x, startSec: Number(e.target.value) } : x)),
-                            )
+                            upsertClip({ ...selectedClip, start: Number(e.target.value), in: Number(e.target.value) })
                           }
                           className="mt-1 w-full rounded-md border bg-[var(--card-2)] px-3 py-2 font-mono-ui text-xs outline-none transition-colors focus:border-[var(--primary)]"
                           style={{ borderColor: 'var(--border)' }}
@@ -580,11 +736,12 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
                         <input
                           type="number"
                           step={0.1}
-                          value={Number(selectedClip.endSec.toFixed(2))}
+                          value={Number((selectedClip.start + (selectedClip.out - selectedClip.in)).toFixed(2))}
                           onChange={(e) =>
-                            onTimelineSegmentsChange(
-                              timelineSegments.map((x) => (x.id === selectedClip.id ? { ...x, endSec: Number(e.target.value) } : x)),
-                            )
+                            upsertClip({
+                              ...selectedClip,
+                              out: Math.max(selectedClip.in + 0.05, Number(e.target.value)),
+                            })
                           }
                           className="mt-1 w-full rounded-md border bg-[var(--card-2)] px-3 py-2 font-mono-ui text-xs outline-none transition-colors focus:border-[var(--primary)]"
                           style={{ borderColor: 'var(--border)' }}
@@ -593,13 +750,12 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
                       <label className="block">
                         <span className="font-mono-ui text-[9px] uppercase tracking-[0.2em] text-[var(--muted-foreground)]">Source</span>
                         <select
-                          value={selectedClip.source || 'primary'}
+                          value={selectedClip.source}
                           onChange={(e) =>
-                            onTimelineSegmentsChange(
-                              timelineSegments.map((x) =>
-                                x.id === selectedClip.id ? { ...x, source: e.target.value === 'secondary' ? 'secondary' : 'primary' } : x,
-                              ),
-                            )
+                            upsertClip({
+                              ...selectedClip,
+                              source: e.target.value === 'secondary' ? 'secondary' : 'primary',
+                            })
                           }
                           className="mt-1 w-full rounded-md border bg-[var(--card-2)] px-3 py-2 text-xs outline-none focus:border-[var(--primary)]"
                           style={{ borderColor: 'var(--border)' }}
@@ -759,8 +915,17 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
                 className="min-w-0 flex-1 rounded-md border bg-[var(--card-2)] px-3 py-2 text-xs outline-none focus:border-[var(--primary)]"
                 style={{ borderColor: 'var(--border)' }}
               />
-              <button type="button" className="mk-btn mk-btn-primary shrink-0" onClick={onVoiceRun} disabled={voiceBusy || !voiceTranscript.trim()}>
-                {voiceBusy ? '…' : 'Run'}
+              <button
+                type="button"
+                className="mk-btn mk-btn-primary shrink-0"
+                onClick={() => {
+                  const transcript = voiceTranscript.trim()
+                  if (transcript) onQuickAssist(transcript)
+                  else onVoiceRun()
+                }}
+                disabled={aiBusy || voiceBusy || !voiceTranscript.trim()}
+              >
+                {aiBusy || voiceBusy ? '…' : 'Run'}
               </button>
             </div>
             {voiceStatus ? <p className="mt-2 font-mono-ui text-[10px] text-[var(--muted-foreground)]">{voiceStatus}</p> : null}
