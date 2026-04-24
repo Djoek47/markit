@@ -429,6 +429,9 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
     <div className="markit-shell grid h-dvh grid-rows-[52px_1fr_28px] overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
       <header className="mk-header">
         <div className="mk-h-left">
+          <Link href="/" className="text-muted-foreground hover:text-foreground mr-2 text-[11px] no-underline">
+            Home
+          </Link>
           <div className="mk-brand">
             Markit<span className="mk-sep">·</span>Editor<span className="mk-beta">Beta</span>
           </div>
@@ -452,7 +455,7 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
               Sign out
             </button>
           ) : (
-            <Link href="/auth/sign-in" className="mk-btn mk-btn-ghost">
+            <Link href="/auth/sign-in?next=/editor" className="mk-btn mk-btn-ghost">
               Sign in
             </Link>
           )}

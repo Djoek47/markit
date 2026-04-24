@@ -240,7 +240,7 @@ export function MarkitEditorView({
               Sign out
             </button>
           ) : (
-            <Link href="/auth/sign-in" className="rounded-full px-3 py-1.5 text-xs text-[var(--studio-accent)] hover:bg-white/5">
+            <Link href="/auth/sign-in?next=/editor" className="rounded-full px-3 py-1.5 text-xs text-[var(--studio-accent)] hover:bg-white/5">
               Sign in
             </Link>
           )}
