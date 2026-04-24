@@ -1,58 +1,63 @@
-import { createHmac, createHash, randomUUID } from 'crypto'
+import { sha256Hex } from './creatix-signing'
+import { buildAriadneM2MRequestHeaders, type MarkitEmbedRequest } from './creatix-ariadne-client'
 
-export type AriadneTraceRequest = {
-  contentId: string
-  recipientKey: string
-  source: 'vault_standalone' | 'frame_export' | 'message_send' | 'mass_dm'
-  lineage?: { jobId?: string; pipelineVersion?: string; encoderProfile?: string }
+export {
+  MarkitCreatixAriadneClient,
+  buildAriadneM2MRequestHeaders,
+  type MarkitEmbedRequest,
+  type MarkitDetectRequest,
+} from './creatix-ariadne-client'
+
+/** @deprecated Use `MarkitEmbedRequest` — kept for call sites. */
+export type AriadneTraceRequest = MarkitEmbedRequest
+
+/**
+ * Build M2M headers for a Creatix Ariadne path. Includes `x-creatix-actor-user-id` when
+ * `CREATIX_ACTOR_USER_ID` (or `opts.actorUserId`) is set — required for Creatix service mode.
+ */
+export function buildServiceHeaders(
+  pathname: string,
+  method: string,
+  bodyText: string,
+  opts?: { idempotencyKey?: string; actorUserId?: string },
+) {
+  return buildAriadneM2MRequestHeaders({
+    serviceName: 'markit',
+    actorUserId: opts?.actorUserId?.trim() || process.env.CREATIX_ACTOR_USER_ID?.trim() || undefined,
+    pathname,
+    method,
+    bodySha256: sha256Hex(bodyText),
+    idempotencyKey: opts?.idempotencyKey,
+    json: method.toUpperCase() === 'POST' && bodyText.length > 0,
+  })
 }
 
-function sharedSecret(): string {
-  return process.env.MARKIT_ARIADNE_SHARED_SECRET || ''
-}
-
-function signServiceMessage(parts: string[]): string {
-  return createHmac('sha256', sharedSecret()).update(parts.join('|')).digest('hex')
-}
-
-function bodySha256(text: string): string {
-  return createHash('sha256').update(text).digest('hex')
-}
-
-export function buildServiceHeaders(pathname: string, method: string, bodyText: string) {
-  const timestamp = String(Math.floor(Date.now() / 1000))
-  const nonce = randomUUID()
-  const idempotencyKey = `markit:${pathname}:${timestamp}:${nonce}`
-  const message = [method.toUpperCase(), pathname, timestamp, nonce, idempotencyKey, bodySha256(bodyText)]
-  const signature = signServiceMessage(message)
-  return {
-    'x-ariadne-contract-version': 'v1.1',
-    'x-creatix-service': 'markit',
-    'x-creatix-timestamp': timestamp,
-    'x-creatix-nonce': nonce,
-    'x-idempotency-key': idempotencyKey,
-    'x-creatix-signature': signature,
-  }
-}
-
+/**
+ * Forwards a trace embed to Creatix with v1.1 M2M signing. Set `CREATIX_ACTOR_USER_ID` to the
+ * creator’s Supabase user id, and `MARKIT_ARIADNE_SHARED_SECRET` to match Creatix.
+ */
 export async function sendTraceToCreatix(
   creatixBaseUrl: string,
-  request: AriadneTraceRequest,
+  request: MarkitEmbedRequest,
   fallbackAuth?: string | null,
 ) {
   const pathname = '/api/ariadne/embed'
-  const body = JSON.stringify(request)
+  const { idempotencyKey, ...payload } = request
+  const body = JSON.stringify(payload)
+  const base = creatixBaseUrl.replace(/\/+$/, '')
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...buildServiceHeaders(pathname, 'POST', body),
+    ...buildAriadneM2MRequestHeaders({
+      serviceName: 'markit',
+      actorUserId: process.env.CREATIX_ACTOR_USER_ID?.trim() || undefined,
+      pathname,
+      method: 'POST',
+      bodySha256: sha256Hex(body),
+      idempotencyKey,
+      json: true,
+    }),
   }
   if (fallbackAuth) headers.Authorization = fallbackAuth
-  const res = await fetch(`${creatixBaseUrl}${pathname}`, {
-    method: 'POST',
-    headers,
-    body,
-  })
+  const res = await fetch(`${base}${pathname}`, { method: 'POST', headers, body })
   const text = await res.text()
   return { status: res.status, text, contentType: res.headers.get('content-type') || 'application/json' }
 }
-

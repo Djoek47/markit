@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sendTraceToCreatix } from '@/lib/ariadne/authority-client'
+import { sendTraceToCreatix, type MarkitEmbedRequest } from '@/lib/ariadne/authority-client'
 
 /**
  * Forwards Ariadne embed to Creatix with the same auth the browser would send,
@@ -21,12 +21,7 @@ export async function POST(req: NextRequest) {
   const auth = req.headers.get('authorization')
   const cookie = req.headers.get('cookie')
 
-  const upstream = await sendTraceToCreatix(creatix, body as {
-    contentId: string
-    recipientKey: string
-    source: 'vault_standalone' | 'frame_export' | 'message_send' | 'mass_dm'
-    lineage?: { jobId?: string; pipelineVersion?: string; encoderProfile?: string }
-  }, auth)
+  const upstream = await sendTraceToCreatix(creatix, body as MarkitEmbedRequest, auth)
 
   if (!auth && cookie) {
     // Preserve legacy cookie-based compatibility by replaying through direct proxy if needed.
