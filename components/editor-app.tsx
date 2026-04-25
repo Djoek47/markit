@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { UIMessage } from 'ai'
 import { createClient } from '@/lib/supabase/client'
@@ -35,6 +35,7 @@ type Preset = {
 }
 
 export function EditorApp() {
+  const router = useRouter()
   const sp = useSearchParams()
   const importUrl = sp.get('importUrl') || ''
   const exportUrl = sp.get('exportUrl') || ''
@@ -504,7 +505,8 @@ export function EditorApp() {
     await createClient().auth.signOut()
     setSessionUserId(null)
     setPaid(null)
-  }, [])
+    router.replace('/')
+  }, [router])
 
   const ariadneBlock = hasVaultBridge && contentId ? (
     <div className="space-y-2 text-xs">
