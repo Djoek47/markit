@@ -1,14 +1,17 @@
 'use client'
 
-import Image from 'next/image'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { BrandSeal } from '@/components/markit-v5/brand-seal'
+import { DivineOrb } from '@/components/markit-v5/divine-orb'
 import type { MarkitEditPlanV1 } from '@/lib/markit-edit-plan'
-import { planNeedsSecondarySource } from '@/lib/markit-edit-plan'
+import { MARKIT_OUTPUT_FORMATS, planNeedsSecondarySource } from '@/lib/markit-edit-plan'
+import { applyEditorDivineAction, makeDivineApplierContext } from '@/lib/markit-v5/divine-action-applier'
+import { useEditorShellStore } from '@/lib/stores/editor-shell-store'
 import type { TimelineSegment } from '@/lib/timeline-project'
 
-type InspectorTab = 'clip' | 'crop' | 'trim' | 'trace'
+export type InspectorTab = 'clip' | 'crop' | 'trim' | 'export' | 'trace'
 
 type LibraryItem = {
   id: string
@@ -88,6 +91,20 @@ export type MarkitEditorV2Props = {
   onVoiceRun: () => void
   voiceBusy: boolean
   voiceStatus: string | null
+  /** Premium Divine add-on: show Realtime voice; otherwise hide the Divine FAB. */
+  divineVoicePremium: boolean
+  markitVoice: {
+    status: 'idle' | 'connecting' | 'connected' | 'error'
+    error: string | null
+    start: () => void
+    end: () => void
+    closingPending: boolean
+  }
+  /** When true with Premium, allow legacy keyword `/api/divine/voice-edit` path (incidents). */
+  keywordVoiceIncident: boolean
+  /** Optional Divine suggestion awaiting user approval (ghost navigation). */
+  pendingDivineAction: import('@/lib/markit-v5/divine-editor-actions').EditorDivineUiAction | null
+  onDivineResolved: () => void
   timelineManifest: { revision: number; segmentChecksum: string }
   cropRect: { x: number; y: number; width: number; height: number }
   onCropRectChange: (next: { x: number; y: number; width: number; height: number }) => void
@@ -228,6 +245,11 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
     onVoiceRun,
     voiceBusy,
     voiceStatus,
+    divineVoicePremium,
+    markitVoice,
+    keywordVoiceIncident,
+    pendingDivineAction,
+    onDivineResolved,
     timelineManifest,
     cropRect,
     onCropRectChange,
@@ -236,7 +258,15 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
     onClearPreview,
   } = props
 
-  const [density, setDensity] = useState<'simple' | 'pro'>('simple')
+  const density = useEditorShellStore((s) => s.density)
+  const setDensity = useEditorShellStore((s) => s.setDensity)
+  const mediaContext = useEditorShellStore((s) => s.mediaContext)
+  const setMediaContext = useEditorShellStore((s) => s.setMediaContext)
+  const exportFormat = useEditorShellStore((s) => s.exportFormat)
+  const setExportFormat = useEditorShellStore((s) => s.setExportFormat)
+  const seekRequest = useEditorShellStore((s) => s.seekRequest)
+  const setPlayheadStore = useEditorShellStore((s) => s.setPlayheadSec)
+
   const [tab, setTab] = useState<InspectorTab>('clip')
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null)
   const [selectedMediaIds, setSelectedMediaIds] = useState<Set<string>>(new Set())
@@ -254,6 +284,18 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
   useEffect(() => {
     document.documentElement.dataset.density = density
   }, [density])
+
+  useEffect(() => {
+    document.documentElement.dataset.mediaContext = mediaContext
+  }, [mediaContext])
+
+  useEffect(() => {
+    if (!seekRequest) return
+    const v = videoRef.current
+    if (!v) return
+    v.currentTime = seekRequest.sec
+    setCurrentTime(seekRequest.sec)
+  }, [seekRequest])
 
   const library = useMemo(() => {
     const items = [...libraryImports]
@@ -287,7 +329,7 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
         setMicHolding(false)
         const transcript = voiceTranscript.trim()
         if (transcript) onQuickAssist(transcript)
-        else onVoiceRun()
+        else if (keywordVoiceIncident) void onVoiceRun()
       }
     }
     window.addEventListener('keydown', onKey)
@@ -296,7 +338,7 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [divineOpen, onQuickAssist, onVoiceRun, voiceTranscript])
+  }, [divineOpen, keywordVoiceIncident, onQuickAssist, onVoiceRun, voiceTranscript])
 
   const filteredLibrary = useMemo(
     () =>
@@ -427,28 +469,49 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
   }
 
   return (
-    <div className="markit-shell grid h-dvh grid-rows-[52px_1fr_28px] overflow-hidden bg-[var(--background)] text-[var(--foreground)]">
+    <div
+      className="markit-shell grid h-dvh overflow-hidden bg-[var(--background)] text-[var(--foreground)]"
+      style={{
+        gridTemplateRows: pendingDivineAction
+          ? '52px minmax(0, auto) 1fr 28px'
+          : '52px 1fr 28px',
+      }}
+    >
       <header className="mk-header">
         <div className="mk-h-left">
           <Link href="/" className="text-muted-foreground hover:text-foreground mr-2 text-[11px] no-underline">
             Home
           </Link>
           <div className="mk-brand flex items-center gap-2">
-            <span className="relative h-6 w-6 flex-shrink-0 overflow-hidden rounded-full border border-[var(--border)] bg-white">
-              <Image src="/icon.png" alt="" width={24} height={24} className="h-full w-full object-cover" />
-            </span>
+            <BrandSeal size={24} />
             <span>
               Markit<span className="mk-sep">·</span>Editor<span className="mk-beta">Beta</span>
             </span>
           </div>
         </div>
-        <div className="flex justify-center">
+        <div className="flex flex-wrap items-center justify-center gap-2">
           <div className="mk-mode-pill">
             <button type="button" className={density === 'simple' ? 'mk-active' : ''} onClick={() => setDensity('simple')}>
               Simple
             </button>
             <button type="button" className={density === 'pro' ? 'mk-active' : ''} onClick={() => setDensity('pro')}>
               Pro
+            </button>
+          </div>
+          <div className="mk-mode-pill">
+            <button
+              type="button"
+              className={mediaContext === 'video' ? 'mk-active' : ''}
+              onClick={() => setMediaContext('video')}
+            >
+              Video
+            </button>
+            <button
+              type="button"
+              className={mediaContext === 'image' ? 'mk-active' : ''}
+              onClick={() => setMediaContext('image')}
+            >
+              Image
             </button>
           </div>
         </div>
@@ -467,6 +530,39 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
           )}
         </div>
       </header>
+
+      {pendingDivineAction ? (
+        <div
+          className="flex min-h-0 items-center justify-between gap-2 border-b px-3 py-2"
+          style={{ borderColor: 'var(--border)', background: 'var(--card)' }}
+        >
+          <span className="flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
+            <DivineOrb size="sm" />
+            Divine suggestion: <span className="font-mono-ui text-[var(--foreground)]">{pendingDivineAction.type}</span>
+          </span>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="mk-btn mk-btn-primary"
+              onClick={() => {
+                if (pendingDivineAction) {
+                  applyEditorDivineAction(
+                    null,
+                    pendingDivineAction,
+                    makeDivineApplierContext((t) => setTab(t)),
+                  )
+                }
+                onDivineResolved()
+              }}
+            >
+              Apply
+            </button>
+            <button type="button" className="mk-btn" onClick={onDivineResolved}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid min-h-0 min-w-0 overflow-hidden max-[920px]:grid-cols-[200px_minmax(0,1fr)] min-[921px]:max-[1179px]:grid-cols-[220px_minmax(0,1fr)_290px] min-[1180px]:grid-cols-[260px_minmax(0,1fr)_320px]">
           <aside className="mk-library">
@@ -587,7 +683,11 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
                           if (!previewUrl) onVideoDuration(d)
                         }
                       }}
-                      onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+                      onTimeUpdate={(e) => {
+                        const t = e.currentTarget.currentTime
+                        setCurrentTime(t)
+                        setPlayheadStore(t)
+                      }}
                       onPlay={() => setPlaying(true)}
                       onPause={() => setPlaying(false)}
                       onEnded={() => setPlaying(false)}
@@ -636,9 +736,14 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
                   </span>
                 ))}
               </div>
-              {[
-                ...timeline.tracks,
-              ].map((track) => {
+              {timeline.tracks
+                .filter((track) => {
+                  if (mediaContext === 'image') {
+                    return track.id === 'v1' || track.id === 'a1'
+                  }
+                  return true
+                })
+                .map((track) => {
                 const visible = !track.proOnly || density === 'pro'
                 if (!visible) return null
                 const swatch = track.kind === 'video' ? 'v' : track.kind === 'audio' ? 'a' : 'o'
@@ -709,6 +814,7 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
                   ['clip', 'Clip'],
                   ['crop', 'Crop'],
                   ['trim', 'Trim'],
+                  ['export', 'Export'],
                   ['trace', 'Trace'],
                 ] as const
               ).map(([id, label]) => (
@@ -841,6 +947,36 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
                 </div>
               ) : null}
 
+              {tab === 'export' ? (
+                <div className="mk-section">
+                  <h4>
+                    Export <em>format</em>
+                  </h4>
+                  <p className="mk-desc">Maps to EditPlan `output` and encoder lineage (Ariadne embed keeps metadata small).</p>
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {MARKIT_OUTPUT_FORMATS.map((fmt) => (
+                      <button
+                        key={fmt}
+                        type="button"
+                        className={`rounded-full border px-2.5 py-1 font-mono-ui text-[10px] uppercase tracking-wide ${
+                          exportFormat === fmt
+                            ? 'border-[var(--primary)] bg-[color-mix(in_oklch,var(--primary)_12%,transparent)] text-[var(--foreground)]'
+                            : 'text-[var(--muted-foreground)]'
+                        }`}
+                        style={{ borderColor: exportFormat === fmt ? 'var(--primary)' : 'var(--border)' }}
+                        onClick={() => setExportFormat(fmt)}
+                      >
+                        {fmt}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-muted-foreground mt-3 text-[10px] leading-relaxed">
+                    Final pixel pipeline may use Markit <code className="font-mono-ui">/api/render</code> when enabled; vault
+                    export remains the primary path for traced files.
+                  </p>
+                </div>
+              ) : null}
+
               {tab === 'trace' ? (
                 <div className="mk-section">
                   <h4>
@@ -873,11 +1009,19 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
         </div>
       </footer>
 
-      <button type="button" className="divine-fab" onClick={() => setDivineOpen((v) => !v)} aria-label="Open Divine voice" aria-expanded={divineOpen}>
-        <IconMic />
-      </button>
+      {divineVoicePremium ? (
+        <button
+          type="button"
+          className="divine-fab"
+          onClick={() => setDivineOpen((v) => !v)}
+          aria-label="Open Divine voice"
+          aria-expanded={divineOpen}
+        >
+          <IconMic />
+        </button>
+      ) : null}
 
-      {divineOpen ? (
+      {divineVoicePremium && divineOpen ? (
         <div className="divine-popper" role="dialog" aria-label="Divine Manager">
           <div className="dp-head">
             <div className="dp-title">
@@ -909,35 +1053,79 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
               <div className="mic-orb" aria-hidden>
                 <IconMic />
               </div>
-              <span className="label">{micHolding ? 'Listening…' : 'Hold Space while open, or type below'}</span>
+              <span className="label">
+                {micHolding
+                  ? 'Listening…'
+                  : keywordVoiceIncident
+                    ? 'Hold Space while open, or use live voice / type below'
+                    : 'Live voice (same as dashboard) — uses your mic'}
+              </span>
               <div className="wave-mini" aria-hidden>
                 {[1, 2, 3, 4, 5].map((i) => (
                   <span key={i} />
                 ))}
               </div>
             </div>
-            <div className="mt-3 flex gap-2">
-              <input
-                value={voiceTranscript}
-                onChange={(e) => onVoiceTranscriptChange(e.target.value)}
-                placeholder="Voice or type intent…"
-                className="min-w-0 flex-1 rounded-md border bg-[var(--card-2)] px-3 py-2 text-xs outline-none focus:border-[var(--primary)]"
-                style={{ borderColor: 'var(--border)' }}
-              />
-              <button
-                type="button"
-                className="mk-btn mk-btn-primary shrink-0"
-                onClick={() => {
-                  const transcript = voiceTranscript.trim()
-                  if (transcript) onQuickAssist(transcript)
-                  else onVoiceRun()
-                }}
-                disabled={aiBusy || voiceBusy || !voiceTranscript.trim()}
-              >
-                {aiBusy || voiceBusy ? '…' : 'Run'}
-              </button>
+            <div className="mt-3 space-y-2 rounded-md border p-3 text-xs" style={{ borderColor: 'var(--border)' }}>
+              <p className="font-medium text-[var(--foreground)]">Divine voice (Premium)</p>
+              <p className="text-[10px] text-[var(--muted-foreground)]">
+                Same OpenAI Realtime session as the main app. Includes Markit context (timeline, import).
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="mk-btn mk-btn-primary"
+                  disabled={markitVoice.status === 'connecting' || markitVoice.status === 'connected'}
+                  onClick={() => markitVoice.start()}
+                >
+                  {markitVoice.status === 'connecting'
+                    ? 'Connecting…'
+                    : markitVoice.status === 'connected'
+                      ? 'Live'
+                      : 'Start live voice'}
+                </button>
+                <button
+                  type="button"
+                  className="mk-btn"
+                  disabled={markitVoice.status !== 'connected' && markitVoice.status !== 'error'}
+                  onClick={() => markitVoice.end()}
+                >
+                  End
+                </button>
+              </div>
+              {markitVoice.error ? (
+                <p className="text-[10px] text-[var(--destructive)]">{markitVoice.error}</p>
+              ) : null}
+              {markitVoice.closingPending ? (
+                <p className="text-[10px] text-[var(--muted-foreground)]">Ending after assistant speaks…</p>
+              ) : null}
             </div>
-            {voiceStatus ? <p className="mt-2 font-mono-ui text-[10px] text-[var(--muted-foreground)]">{voiceStatus}</p> : null}
+            {keywordVoiceIncident ? (
+              <div className="mt-3 flex gap-2">
+                <input
+                  value={voiceTranscript}
+                  onChange={(e) => onVoiceTranscriptChange(e.target.value)}
+                  placeholder="Incident: keyword intent (legacy)…"
+                  className="min-w-0 flex-1 rounded-md border bg-[var(--card-2)] px-3 py-2 text-xs outline-none focus:border-[var(--primary)]"
+                  style={{ borderColor: 'var(--border)' }}
+                />
+                <button
+                  type="button"
+                  className="mk-btn mk-btn-primary shrink-0"
+                  onClick={() => {
+                    const transcript = voiceTranscript.trim()
+                    if (transcript) onQuickAssist(transcript)
+                    else void onVoiceRun()
+                  }}
+                  disabled={aiBusy || voiceBusy || !voiceTranscript.trim()}
+                >
+                  {aiBusy || voiceBusy ? '…' : 'Run'}
+                </button>
+              </div>
+            ) : null}
+            {voiceStatus && keywordVoiceIncident ? (
+              <p className="mt-2 font-mono-ui text-[10px] text-[var(--muted-foreground)]">{voiceStatus}</p>
+            ) : null}
             <div className="mt-3 max-h-28 overflow-y-auto rounded-md border p-2 text-[11px]" style={{ borderColor: 'var(--border)' }}>
               {chatMessages.length === 0 ? <p className="text-[var(--muted-foreground)]">No messages yet.</p> : null}
               {chatMessages.slice(-4).map((m) => (

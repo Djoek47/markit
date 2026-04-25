@@ -5,6 +5,9 @@
 
 export type MarkitEditSource = 'primary' | 'secondary'
 
+export const MARKIT_OUTPUT_FORMATS = ['mp4', 'mov', 'webm', 'gif', 'jpg', 'png', 'webp'] as const
+export type MarkitOutputFormat = (typeof MARKIT_OUTPUT_FORMATS)[number]
+
 export type MarkitEditPlanV1 = {
   version: 1
   /** concat_segments = default; side_by_side reserved for future (requires different ffmpeg graph) */
@@ -16,6 +19,12 @@ export type MarkitEditPlanV1 = {
     y: number
     width: number
     height: number
+  }
+  /** Export / render target — kept small for Creatix embed lineage; avoid huge bespoke payloads in embed. */
+  output?: {
+    format: MarkitOutputFormat
+    aspectPreset?: string
+    encoderProfile?: string
   }
   segments: {
     startSec: number
@@ -96,11 +105,25 @@ export function parseMarkitEditPlanJson(raw: string): MarkitEditPlanV1 | null {
       if (valid) crop = { x, y, width, height }
     }
 
+    const outRaw = o.output as Record<string, unknown> | undefined
+    let output: MarkitEditPlanV1['output']
+    if (outRaw && typeof outRaw === 'object') {
+      const fmt = outRaw.format
+      if (typeof fmt === 'string' && (MARKIT_OUTPUT_FORMATS as readonly string[]).includes(fmt)) {
+        output = {
+          format: fmt as MarkitOutputFormat,
+          aspectPreset: typeof outRaw.aspectPreset === 'string' ? outRaw.aspectPreset : undefined,
+          encoderProfile: typeof outRaw.encoderProfile === 'string' ? outRaw.encoderProfile : undefined,
+        }
+      }
+    }
+
     return {
       version: 1,
       kind: kind as MarkitEditPlanV1['kind'],
       label: typeof o.label === 'string' ? o.label : undefined,
       ...(crop ? { crop } : {}),
+      ...(output ? { output } : {}),
       segments,
     }
   } catch {

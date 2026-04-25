@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react'
 const brandLogo = '/icon.png'
 const DEFAULT_NEXT = '/editor'
 const MS = 5300
+const MS_REDUCED = 600
 
 export function WelcomeContent() {
   const router = useRouter()
@@ -14,24 +15,36 @@ export function WelcomeContent() {
   const nextParam = sp.get('next')
   const next = nextParam && nextParam.startsWith('/') ? nextParam : DEFAULT_NEXT
   const [allowSkip, setAllowSkip] = useState(false)
+  const [reducedMotion, setReducedMotion] = useState(false)
 
   const go = useCallback(() => {
     router.replace(next)
   }, [next, router])
 
   useEffect(() => {
-    const t = setTimeout(() => setAllowSkip(true), 800)
-    return () => clearTimeout(t)
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    setReducedMotion(mq.matches)
+    const onChange = () => setReducedMotion(mq.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
   }, [])
 
+  const dwellMs = reducedMotion ? MS_REDUCED : MS
+  const skipDelayMs = reducedMotion ? 0 : 800
+
   useEffect(() => {
-    const t = setTimeout(go, MS)
+    const t = setTimeout(() => setAllowSkip(true), skipDelayMs)
     return () => clearTimeout(t)
-  }, [go])
+  }, [skipDelayMs])
+
+  useEffect(() => {
+    const t = setTimeout(go, dwellMs)
+    return () => clearTimeout(t)
+  }, [dwellMs, go])
 
   return (
     <div
-      className="fixed inset-0 flex flex-col items-center justify-center overflow-hidden"
+      className={`fixed inset-0 flex flex-col items-center justify-center overflow-hidden${reducedMotion ? ' mkt-welcome-still' : ''}`}
       style={{ background: 'var(--background)' }}
     >
       <div

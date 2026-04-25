@@ -1,8 +1,9 @@
 import Image from 'next/image'
 import Link from 'next/link'
 
-const CREATIX = process.env.NEXT_PUBLIC_CREATIX_APP_URL || 'https://www.circeetvenus.com'
+import { BrandSeal } from '@/components/markit-v5/brand-seal'
 
+const CREATIX = process.env.NEXT_PUBLIC_CREATIX_APP_URL || 'https://www.circeetvenus.com'
 const brandLogo = '/icon.png'
 
 function Nav() {
@@ -12,12 +13,7 @@ function Nav() {
       style={{ borderColor: 'var(--border)', background: 'color-mix(in oklch, var(--background) 82%, transparent)' }}
     >
       <div className="flex items-center gap-3.5">
-        <div
-          className="relative h-9 w-9 overflow-hidden rounded-full border bg-white shadow-md"
-          style={{ borderColor: 'var(--border)', boxShadow: '0 0 24px color-mix(in oklch, var(--primary) 20%, transparent)' }}
-        >
-          <Image src={brandLogo} alt="Circe et Venus" width={36} height={36} className="h-full w-full object-cover" />
-        </div>
+        <BrandSeal size={36} />
         <div className="font-serif-display text-[15px] font-medium tracking-[0.22em]">
           CIRCE <em className="not-italic text-[var(--primary)]">et</em> VENUS
         </div>
@@ -43,13 +39,13 @@ function Nav() {
         >
           Sign in
         </Link>
-        <a
-          href="#cta"
+        <Link
+          href="/auth/sign-in?next=%2Feditor"
           className="rounded-full bg-[var(--primary)] px-4 py-2 text-[13px] font-medium text-[var(--primary-foreground)] shadow-lg transition-transform hover:-translate-y-0.5"
           style={{ boxShadow: '0 4px 20px -4px color-mix(in oklch, var(--primary) 40%, transparent)' }}
         >
           Begin
-        </a>
+        </Link>
       </div>
     </header>
   )

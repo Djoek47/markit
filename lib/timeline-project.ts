@@ -53,12 +53,14 @@ export function timelineToEditPlan(
   segments: TimelineSegment[],
   label = 'timeline-export',
   crop?: MarkitEditPlanV1['crop'],
+  output?: MarkitEditPlanV1['output'] | null,
 ): MarkitEditPlanV1 {
   return {
     version: 1,
     kind: 'concat_segments',
     label,
     ...(crop && !isFullFrameCrop(crop) ? { crop } : {}),
+    ...(output ? { output } : {}),
     segments: segments.map((s) => ({
       startSec: s.startSec,
       endSec: s.endSec,

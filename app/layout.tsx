@@ -17,7 +17,7 @@ const dmSans = DM_Sans({
 const jetBrainsMono = JetBrains_Mono({
   subsets: ['latin'],
   variable: '--font-jetbrains-mono',
-  weight: ['400', '500', '600'],
+  weight: ['300', '400', '500', '600'],
 })
 
 export const dynamic = 'force-dynamic'

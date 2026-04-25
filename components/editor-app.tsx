@@ -6,11 +6,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { UIMessage } from 'ai'
 import { createClient } from '@/lib/supabase/client'
 import { isPaidSubscription } from '@/lib/billing'
+import { hasDivineVoicePremium } from '@/lib/premium-divine'
+import { useDivineActionStream } from '@/hooks/use-divine-action-stream'
+import { useMarkitDivineVoice } from '@/hooks/use-markit-divine-voice'
 import { parseVaultContentIdFromExportUrl } from '@/lib/content-id'
 import presetsData from '@/lib/data/frame-edit-presets.json'
 import { VideoTrimSection } from '@/components/video-trim-section'
 import { MarkitEditorV2 } from '@/components/studio/markit-editor-v2'
+import type { EditorDivineUiAction } from '@/lib/markit-v5/divine-editor-actions'
 import type { MarkitEditPlanV1 } from '@/lib/markit-edit-plan'
+import { useEditorShellStore } from '@/lib/stores/editor-shell-store'
 import { findLatestEditPlan, planNeedsSecondarySource } from '@/lib/markit-edit-plan'
 import { runMarkitEditPlan } from '@/lib/run-markit-edit-plan'
 import {
@@ -26,6 +31,11 @@ import { flagFramerTracedExport } from '@/lib/flags'
 import { isFullFrameCrop } from '@/lib/crop-utils'
 
 const CREATIX = process.env.NEXT_PUBLIC_CREATIX_APP_URL || 'https://www.circeetvenus.com'
+
+function editPlanOutputFromShell(): MarkitEditPlanV1['output'] {
+  const s = useEditorShellStore.getState()
+  return { format: s.exportFormat, encoderProfile: s.encoderProfile }
+}
 
 type Preset = {
   id: string
@@ -49,6 +59,7 @@ export function EditorApp() {
 
   const [sessionUserId, setSessionUserId] = useState<string | null>(null)
   const [paid, setPaid] = useState<boolean | null>(null)
+  const [divineVoicePremium, setDivineVoicePremium] = useState<boolean | null>(null)
   const [authReady, setAuthReady] = useState(false)
   const [entitlementReady, setEntitlementReady] = useState(false)
 
@@ -71,6 +82,7 @@ export function EditorApp() {
     if (!authReady) return
     if (!sessionUserId) {
       setPaid(null)
+      setDivineVoicePremium(null)
       setEntitlementReady(true)
       return
     }
@@ -78,11 +90,12 @@ export function EditorApp() {
     const supabase = createClient()
     void supabase
       .from('subscriptions')
-      .select('plan_id,status')
+      .select('plan_id,status,divine_voice_premium')
       .eq('user_id', sessionUserId)
       .maybeSingle()
       .then(({ data }) => {
         setPaid(isPaidSubscription(data))
+        setDivineVoicePremium(hasDivineVoicePremium(data))
         setEntitlementReady(true)
       })
   }, [authReady, sessionUserId])
@@ -284,11 +297,12 @@ export function EditorApp() {
       }
       setExportStatus('Rendering preview in your browser…')
       try {
-        const plan = timelineToEditPlan(segments, 'markit-preview', cropRect)
+        const plan = timelineToEditPlan(segments, 'markit-preview', cropRect, editPlanOutputFromShell())
         const mergedCrop = plan.crop ?? cropRect
         const effectivePlan: MarkitEditPlanV1 = {
           ...plan,
           crop: isFullFrameCrop(mergedCrop) ? undefined : mergedCrop,
+          output: plan.output ?? editPlanOutputFromShell(),
         }
         setExportStatus('Loading video for preview…')
         const pres = await fetch(importUrl, { method: 'GET', mode: 'cors' })
@@ -354,6 +368,7 @@ export function EditorApp() {
         const effectivePlan: MarkitEditPlanV1 = {
           ...plan,
           crop: isFullFrameCrop(mergedCrop) ? undefined : mergedCrop,
+          output: plan.output ?? editPlanOutputFromShell(),
         }
 
         const out = await runMarkitEditPlan(primaryBlob, secondaryBlob, effectivePlan, (p) => {
@@ -391,11 +406,14 @@ export function EditorApp() {
 
   const exportTimelineToVault = useCallback(async () => {
     if (timelineSegments.length === 0) return
-    const plan = timelineToEditPlan(timelineSegments, 'timeline-export', cropRect)
+    const plan = timelineToEditPlan(timelineSegments, 'timeline-export', cropRect, editPlanOutputFromShell())
     await executeEditPlan(plan)
   }, [cropRect, executeEditPlan, timelineSegments])
 
   const runVoiceCommand = useCallback(async () => {
+    if (process.env.NEXT_PUBLIC_MARKIT_DIVINE_KEYWORD_INCIDENT !== '1' && process.env.NEXT_PUBLIC_MARKIT_DIVINE_KEYWORD_INCIDENT !== 'true') {
+      return
+    }
     const transcript = voiceTranscript.trim()
     if (!transcript) return
     setVoiceBusy(true)
@@ -460,6 +478,8 @@ export function EditorApp() {
     }
   }, [runLocalPreview, videoDuration, voiceTranscript])
 
+  const [pendingDivine, setPendingDivine] = useState<EditorDivineUiAction | null>(null)
+
   const [recipientKey, setRecipientKey] = useState('')
   const [ariadneBusy, setAriadneBusy] = useState(false)
   const [ariadneMsg, setAriadneMsg] = useState<string | null>(null)
@@ -505,8 +525,80 @@ export function EditorApp() {
     await createClient().auth.signOut()
     setSessionUserId(null)
     setPaid(null)
+    setDivineVoicePremium(null)
     router.replace('/')
   }, [router])
+
+  const getAccessToken = useCallback(
+    () => createClient().auth.getSession().then((r) => r.data.session?.access_token ?? null),
+    [],
+  )
+  const timelineSummary = useMemo(
+    () =>
+      JSON.stringify(
+        timelineSegments.map((s) => ({
+          id: s.id,
+          start: s.startSec,
+          end: s.endSec,
+          source: s.source,
+          label: s.label,
+        })),
+      ).slice(0, 4000),
+    [timelineSegments],
+  )
+  const markitVoice = useMarkitDivineVoice({
+    enabled: divineVoicePremium === true,
+    getAccessToken,
+    importUrl: importUrl || 'none',
+    timelineSummary,
+  })
+
+  useDivineActionStream({
+    enabled: Boolean(sessionUserId),
+    getAccessToken,
+    onAction: (action) => {
+      if (action.type === 'noop') return
+      setPendingDivine(action)
+    },
+  })
+
+  useEffect(() => {
+    if (!sessionUserId) return
+    const ac = new AbortController()
+    const id = setTimeout(() => {
+      void (async () => {
+        const token = await getAccessToken()
+        if (!token || ac.signal.aborted) return
+        const { exportFormat, encoderProfile, density, mediaContext } = useEditorShellStore.getState()
+        try {
+          await fetch(`${CREATIX}/api/divine/register-context`, {
+            method: 'POST',
+            signal: ac.signal,
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              importUrl: importUrl || null,
+              importUrl2: importUrl2 || null,
+              exportUrl: exportUrl || null,
+              timelineSummary,
+              exportFormat,
+              encoderProfile,
+              density,
+              mediaContext,
+            }),
+          })
+        } catch {
+          /* offline */
+        }
+      })()
+    }, 1500)
+    return () => {
+      ac.abort()
+      clearTimeout(id)
+    }
+  }, [CREATIX, sessionUserId, importUrl, importUrl2, exportUrl, timelineSummary, getAccessToken])
+  const keywordVoiceIncident =
+    process.env.NEXT_PUBLIC_MARKIT_DIVINE_KEYWORD_INCIDENT === '1' ||
+    process.env.NEXT_PUBLIC_MARKIT_DIVINE_KEYWORD_INCIDENT === 'true'
 
   const ariadneBlock = hasVaultBridge && contentId ? (
     <div className="space-y-2 text-xs">
@@ -636,6 +728,17 @@ export function EditorApp() {
       onVoiceRun={() => void runVoiceCommand()}
       voiceBusy={voiceBusy}
       voiceStatus={voiceStatus}
+      divineVoicePremium={divineVoicePremium === true}
+      markitVoice={{
+        status: markitVoice.status,
+        error: markitVoice.error,
+        start: markitVoice.startVoice,
+        end: markitVoice.endVoice,
+        closingPending: markitVoice.closingPending,
+      }}
+      keywordVoiceIncident={keywordVoiceIncident}
+      pendingDivineAction={pendingDivine}
+      onDivineResolved={() => setPendingDivine(null)}
       cropRect={cropRect}
       onCropRectChange={(next) => {
         const maxX = Math.max(0, 1 - next.width)
