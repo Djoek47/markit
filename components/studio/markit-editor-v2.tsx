@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -432,8 +433,13 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
           <Link href="/" className="text-muted-foreground hover:text-foreground mr-2 text-[11px] no-underline">
             Home
           </Link>
-          <div className="mk-brand">
-            Markit<span className="mk-sep">·</span>Editor<span className="mk-beta">Beta</span>
+          <div className="mk-brand flex items-center gap-2">
+            <span className="relative h-6 w-6 flex-shrink-0 overflow-hidden rounded-full border border-[var(--border)] bg-white">
+              <Image src="/icon.png" alt="" width={24} height={24} className="h-full w-full object-cover" />
+            </span>
+            <span>
+              Markit<span className="mk-sep">·</span>Editor<span className="mk-beta">Beta</span>
+            </span>
           </div>
         </div>
         <div className="flex justify-center">

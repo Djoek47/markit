@@ -3,7 +3,7 @@ import Link from 'next/link'
 
 const CREATIX = process.env.NEXT_PUBLIC_CREATIX_APP_URL || 'https://www.circeetvenus.com'
 
-const seal = '/brand/cev-seal.svg'
+const brandLogo = '/icon.png'
 
 function Nav() {
   return (
@@ -16,7 +16,7 @@ function Nav() {
           className="relative h-9 w-9 overflow-hidden rounded-full border bg-white shadow-md"
           style={{ borderColor: 'var(--border)', boxShadow: '0 0 24px color-mix(in oklch, var(--primary) 20%, transparent)' }}
         >
-          <Image src={seal} alt="Circe et Venus" width={36} height={36} className="h-full w-full object-contain" />
+          <Image src={brandLogo} alt="Circe et Venus" width={36} height={36} className="h-full w-full object-cover" />
         </div>
         <div className="font-serif-display text-[15px] font-medium tracking-[0.22em]">
           CIRCE <em className="not-italic text-[var(--primary)]">et</em> VENUS
@@ -73,7 +73,7 @@ export function MarkitHomePage() {
         <section className="mx-auto grid max-w-[1400px] items-center gap-16 px-5 py-16 md:grid-cols-[1.1fr_0.9fr] md:px-12 md:py-24">
           <div>
             <p className="text-primary font-mono-ui mb-7 flex items-center gap-3 text-[10px] font-medium uppercase tracking-[0.32em] before:block before:h-px before:w-6 before:bg-[var(--primary)]">
-              Markit · The Divine Editor
+              Markit · Creatix Studio
             </p>
             <h1 className="font-serif-display text-[clamp(2.2rem,6vw,5.2rem)] font-medium leading-[0.98] tracking-tight">
               Edit by <em className="not-italic text-[var(--primary)]">voice.</em>
@@ -137,11 +137,11 @@ export function MarkitHomePage() {
               />
               <div className="border-background relative z-[1] h-full w-full overflow-hidden rounded-full border bg-white shadow-2xl">
                 <Image
-                  src={seal}
-                  alt="Circe et Venus seal"
+                  src={brandLogo}
+                  alt="Circe et Venus"
                   width={480}
                   height={480}
-                  className="h-full w-full object-contain p-2"
+                  className="h-full w-full object-cover p-0.5"
                 />
               </div>
             </div>
@@ -326,7 +326,7 @@ export function MarkitHomePage() {
           <div>
             <div className="mb-2 flex items-center gap-2">
               <div className="h-7 w-7 overflow-hidden rounded-full border bg-white">
-                <Image src={seal} alt="" width={28} height={28} className="h-full w-full object-contain" />
+                <Image src={brandLogo} alt="" width={28} height={28} className="h-full w-full object-cover" />
               </div>
               <span className="font-serif-display text-sm tracking-[0.2em]">
                 CIRCE <em className="not-italic text-[var(--primary)]">et</em> VENUS

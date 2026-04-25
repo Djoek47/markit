@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Cinzel, DM_Sans, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 
@@ -22,10 +22,43 @@ const jetBrainsMono = JetBrains_Mono({
 
 export const dynamic = 'force-dynamic'
 
+const appUrl = process.env.NEXT_PUBLIC_MARKIT_APP_URL || 'http://localhost:3020'
+
 export const metadata: Metadata = {
-  title: 'Markit (Beta) — Circe et Venus',
+  metadataBase: new URL(appUrl),
+  applicationName: 'Markit',
+  title: {
+    default: 'Markit — Creatix Studio · Circe et Venus',
+    template: '%s · Markit',
+  },
   description:
-    'Beta video editor for vault assets — trim, export, AI assist, Ariadne Trace. Features and behavior may change.',
+    'Creatix Markit: voice-first video and image editor for adult creators. Ariadne trace on every export. Same account and branding as circeetvenus.com.',
+  manifest: '/manifest.webmanifest',
+  icons: {
+    icon: [
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    apple: '/apple-touch-icon.png',
+  },
+  appleWebApp: {
+    capable: true,
+    title: 'Markit',
+    statusBarStyle: 'black-translucent',
+  },
+  formatDetection: {
+    telephone: false,
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#fafafa' },
+    { media: '(prefers-color-scheme: dark)', color: '#0a0a0a' },
+  ],
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

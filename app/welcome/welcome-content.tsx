@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 
-const seal = '/brand/cev-seal.svg'
+const brandLogo = '/icon.png'
 const DEFAULT_NEXT = '/editor'
 const MS = 5300
 
@@ -68,7 +68,7 @@ export function WelcomeContent() {
             className="border-background relative h-[min(280px,70vw)] w-[min(280px,70vw)] overflow-hidden rounded-full border-2 bg-white shadow-2xl"
             style={{ animation: 'mkt-welcome-seal 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both' }}
           >
-            <Image src={seal} alt="" width={280} height={280} className="h-full w-full object-contain p-1" />
+            <Image src={brandLogo} alt="" width={280} height={280} className="h-full w-full object-cover p-0.5" />
           </div>
         </div>
         <div
@@ -81,7 +81,7 @@ export function WelcomeContent() {
             The <em className="not-italic text-[var(--primary)]">editor</em> awaits.
           </h1>
           <p className="text-muted-foreground font-serif-display [animation:mkt-fade-in_0.6s_ease-out_1.6s_both] mt-4 text-lg italic">
-            Your Vault is ready. Your voice is live.
+            Same Circe et Venus account — Markit is ready.
           </p>
         </div>
         <div
