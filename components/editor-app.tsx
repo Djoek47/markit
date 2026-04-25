@@ -90,7 +90,8 @@ export function EditorApp() {
     const supabase = createClient()
     void supabase
       .from('subscriptions')
-      .select('plan_id,status,divine_voice_premium')
+      // Omit divine_voice_premium until DB has scripts/075_subscriptions_divine_voice_premium.sql applied
+      .select('plan_id,status')
       .eq('user_id', sessionUserId)
       .maybeSingle()
       .then(({ data, error }) => {
