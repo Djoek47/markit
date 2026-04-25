@@ -4,20 +4,17 @@ import { useEffect, useRef } from 'react'
 import type { EditorDivineUiAction } from '@/lib/markit-v5/divine-editor-actions'
 import { parseEditorDivineUiAction } from '@/lib/markit-v5/divine-editor-actions'
 
-const creatix = (process.env.NEXT_PUBLIC_CREATIX_APP_URL || 'https://www.circeetvenus.com').replace(/\/$/, '')
-
 type DivineStreamHandlers = {
   onAction: (action: EditorDivineUiAction) => void
-  getAccessToken: () => Promise<string | null>
   enabled: boolean
 }
 
 /**
- * Stream `divine_action` events from Creatix (`GET /api/divine/action-stream`) using fetch + SSE framing.
- * EventSource cannot set Authorization; Markit uses Bearer from Supabase session.
+ * Stream `divine_action` events via Markit `GET /api/creatix/divine-action-stream` (proxies Creatix SSE).
+ * Same-origin + session cookies — avoids cross-origin CORS / Referrer issues with circeetvenus.com.
  */
 export function useDivineActionStream(opts: DivineStreamHandlers) {
-  const { getAccessToken, enabled, onAction } = opts
+  const { enabled, onAction } = opts
   const onActionRef = useRef(onAction)
   useEffect(() => {
     onActionRef.current = onAction
@@ -27,10 +24,9 @@ export function useDivineActionStream(opts: DivineStreamHandlers) {
     if (!enabled) return
     let cancelled = false
     const run = async () => {
-      const token = await getAccessToken()
-      if (!token || cancelled) return
-      const res = await fetch(`${creatix}/api/divine/action-stream`, {
-        headers: { Authorization: `Bearer ${token}`, Accept: 'text/event-stream' },
+      const res = await fetch('/api/creatix/divine-action-stream', {
+        credentials: 'include',
+        headers: { Accept: 'text/event-stream' },
         cache: 'no-store',
       })
       if (!res.ok || !res.body) return
@@ -67,5 +63,5 @@ export function useDivineActionStream(opts: DivineStreamHandlers) {
     return () => {
       cancelled = true
     }
-  }, [enabled, getAccessToken])
+  }, [enabled])
 }

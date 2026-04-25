@@ -559,7 +559,6 @@ export function EditorApp() {
 
   useDivineActionStream({
     enabled: Boolean(sessionUserId),
-    getAccessToken,
     onAction: (action) => {
       if (action.type === 'noop') return
       setPendingDivine(action)
@@ -571,14 +570,14 @@ export function EditorApp() {
     const ac = new AbortController()
     const id = setTimeout(() => {
       void (async () => {
-        const token = await getAccessToken()
-        if (!token || ac.signal.aborted) return
+        if (ac.signal.aborted) return
         const { exportFormat, encoderProfile, density, mediaContext } = useEditorShellStore.getState()
         try {
-          await fetch(`${CREATIX}/api/divine/register-context`, {
+          await fetch('/api/creatix/divine-register-context', {
             method: 'POST',
             signal: ac.signal,
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               importUrl: importUrl || null,
               importUrl2: importUrl2 || null,
@@ -599,7 +598,7 @@ export function EditorApp() {
       ac.abort()
       clearTimeout(id)
     }
-  }, [CREATIX, sessionUserId, importUrl, importUrl2, exportUrl, timelineSummary, getAccessToken])
+  }, [sessionUserId, importUrl, importUrl2, exportUrl, timelineSummary])
   const keywordVoiceIncident =
     process.env.NEXT_PUBLIC_MARKIT_DIVINE_KEYWORD_INCIDENT === '1' ||
     process.env.NEXT_PUBLIC_MARKIT_DIVINE_KEYWORD_INCIDENT === 'true'

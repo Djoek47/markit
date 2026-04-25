@@ -6,14 +6,23 @@
 
 ## Action stream + context (Creatix)
 
-- **`GET {CREATIX}/api/divine/action-stream`** — SSE (`text/event-stream`) with events `connected`, `heartbeat`, and `divine_action` payloads shaped as `{ action: <EditorDivineUiAction> }`. Markit authenticates with `Authorization: Bearer <supabase access_token>`.
-- **`POST {CREATIX}/api/divine/register-context`** — JSON body stored server-side per user (in-memory bridge in `lib/divine/markit-divine-bridge.ts` until scaled).
+Upstream routes on Creatix:
 
-Markit registers context on a debounced timer from `components/editor-app.tsx` and consumes the action stream in `hooks/use-divine-action-stream.ts`. Suggestions are approval-gated in `components/studio/markit-editor-v2.tsx` before `applyEditorDivineAction` runs.
+- **`GET /api/divine/action-stream`** — SSE with `connected`, `heartbeat`, `divine_action` (`{ action: ... }`).
+- **`POST /api/divine/register-context`** — JSON stored per user (`lib/divine/markit-divine-bridge.ts` on Creatix).
 
-## CORS
+**Markit app** calls same-origin proxies only (no cross-origin browser requests to circeetvenus.com):
 
-Creatix `lib/cors-markit.ts` must allow your Markit origin (`NEXT_PUBLIC_MARKIT_URL` on Creatix).
+- **`GET /api/creatix/divine-action-stream`** → forwards with session → Creatix.
+- **`POST /api/creatix/divine-register-context`** → same.
+
+So you do **not** need `NEXT_PUBLIC_MARKIT_URL` on Creatix for these two flows. Direct browser calls to Creatix still need CORS (see below).
+
+Context registration runs on a debounced timer from `components/editor-app.tsx`; the stream is consumed in `hooks/use-divine-action-stream.ts`. Suggestions are approval-gated in `components/studio/markit-editor-v2.tsx`.
+
+## CORS (optional)
+
+Only needed if something calls Creatix divine APIs **from the browser** on another origin. Set `NEXT_PUBLIC_MARKIT_URL` on Creatix (comma-separated allowed in `lib/cors-markit.ts` if you extend it).
 
 ## End-to-end smoke (test enqueue)
 

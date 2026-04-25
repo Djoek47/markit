@@ -6,7 +6,7 @@ Markit is a single Next.js App Router application (port 3020 in dev). Marketing 
 
 - **Vault bridge:** When opened from Circe et Venus with `importUrl`, `exportUrl`, and `exportToken`, the editor POSTs rendered files directly to Creatix vault export endpoints (large bodies avoid Markit proxy limits).
 - **Ariadne:** Embed and detect calls use the shared M2M signing contract in `lib/ariadne/creatix-signing.ts`, matching Creatix `lib/ariadne/service-auth.ts`.
-- **Divine:** Premium Realtime voice uses Markit API proxies under `app/api/creatix/*` with `Authorization: Bearer` from the shared Supabase session. Server-pushed editor actions use Creatix `GET /api/divine/action-stream` (fetch + SSE parsing) with the same Bearer token.
+- **Divine:** Premium Realtime voice uses Markit `app/api/creatix/*` proxies. The editor action stream and `register-context` also proxy through Markit (same origin + cookies) to avoid cross-origin CORS to Creatix.
 
 ## Lazy modules
 
