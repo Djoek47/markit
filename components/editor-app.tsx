@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { UIMessage } from 'ai'
 import { createClient } from '@/lib/supabase/client'
-import { isPaidSubscription } from '@/lib/billing'
+import { isMarkitEditorEntitled } from '@/lib/billing'
 import { hasDivineVoicePremium } from '@/lib/premium-divine'
 import { useDivineActionStream } from '@/hooks/use-divine-action-stream'
 import { useMarkitDivineVoice } from '@/hooks/use-markit-divine-voice'
@@ -93,8 +93,11 @@ export function EditorApp() {
       .select('plan_id,status,divine_voice_premium')
       .eq('user_id', sessionUserId)
       .maybeSingle()
-      .then(({ data }) => {
-        setPaid(isPaidSubscription(data))
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn('[markit] subscriptions read failed', error.message)
+        }
+        setPaid(isMarkitEditorEntitled(data))
         setDivineVoicePremium(hasDivineVoicePremium(data))
         setEntitlementReady(true)
       })

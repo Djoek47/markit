@@ -18,3 +18,18 @@ export function isPaidSubscription(row: {
   if (st !== 'active' && st !== 'trialing') return false
   return isPaidPlanId(row.plan_id)
 }
+
+/**
+ * Markit /editor when opened without a vault bridge link: allow anyone on a **paid plan id** whose
+ * Stripe subscription is still in a billable or grace state. `isPaidSubscription` alone rejects
+ * `past_due`, which is common and still "subscribed" from the user’s point of view.
+ */
+export function isMarkitEditorEntitled(row: {
+  plan_id?: string | null
+  status?: string | null
+} | null): boolean {
+  if (!row?.plan_id || !isPaidPlanId(row.plan_id)) return false
+  const st = (row.status || '').toLowerCase()
+  if (st === 'active' || st === 'trialing' || st === 'past_due') return true
+  return false
+}
