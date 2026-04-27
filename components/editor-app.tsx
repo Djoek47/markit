@@ -29,6 +29,7 @@ import { createClipAtPlayhead } from '@/lib/editor/edit-operations'
 import { createExportManifest } from '@/lib/editor/export-plan'
 import { flagFramerTracedExport } from '@/lib/flags'
 import { isFullFrameCrop } from '@/lib/crop-utils'
+import { interpretDetectResponse, formatVerdictLine, type DetectVerdict } from '@/lib/ariadne/detect-interpret'
 
 const CREATIX = process.env.NEXT_PUBLIC_CREATIX_APP_URL || 'https://www.circeetvenus.com'
 
@@ -487,7 +488,13 @@ export function EditorApp() {
   const [recipientKey, setRecipientKey] = useState('')
   const [ariadneBusy, setAriadneBusy] = useState(false)
   const [ariadneMsg, setAriadneMsg] = useState<string | null>(null)
+  const [tracedDownloadUrl, setTracedDownloadUrl] = useState<string | null>(null)
+  const [tracedPayloadId, setTracedPayloadId] = useState<string | null>(null)
   const tracedExportEnabled = flagFramerTracedExport()
+
+  const [verifyBusy, setVerifyBusy] = useState(false)
+  const [verifyVerdict, setVerifyVerdict] = useState<DetectVerdict | null>(null)
+  const [verifyError, setVerifyError] = useState<string | null>(null)
 
   const applyAriadne = useCallback(async () => {
     if (!contentId || !exportToken || !recipientKey.trim()) {
@@ -496,6 +503,8 @@ export function EditorApp() {
     }
     setAriadneBusy(true)
     setAriadneMsg(null)
+    setTracedDownloadUrl(null)
+    setTracedPayloadId(null)
     try {
       const res = await fetch('/api/ariadne-proxy', {
         method: 'POST',
@@ -509,18 +518,64 @@ export function EditorApp() {
           source: 'frame_export',
         }),
       })
-      const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string }
-      if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string
+        message?: string
+        success?: boolean
+        downloadUrl?: string
+        payloadId?: string
+        exportId?: string
+        algorithmVersion?: string
+      }
+      if (!res.ok || data.success === false) {
         setAriadneMsg(data.error || data.message || res.statusText)
         return
       }
-      setAriadneMsg('Ariadne marker embedded. Vault file updated on Circe et Venus.')
+      if (typeof data.downloadUrl === 'string' && data.downloadUrl.length > 0) {
+        setTracedDownloadUrl(data.downloadUrl)
+      }
+      if (typeof data.payloadId === 'string' && data.payloadId.length > 0) {
+        setTracedPayloadId(data.payloadId)
+      }
+      const algo = data.algorithmVersion ? ` (${data.algorithmVersion})` : ''
+      setAriadneMsg(`Traced copy ready${algo}. Download below or share the link with ${recipientKey.trim()}.`)
     } catch (e) {
       setAriadneMsg(e instanceof Error ? e.message : 'Request failed')
     } finally {
       setAriadneBusy(false)
     }
   }, [contentId, exportToken, recipientKey])
+
+  const verifyLeak = useCallback(
+    async (file: File) => {
+      setVerifyBusy(true)
+      setVerifyVerdict(null)
+      setVerifyError(null)
+      try {
+        const fd = new FormData()
+        fd.append('file', file)
+        const res = await fetch('/api/ariadne/detect-proxy', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${exportToken}`,
+          },
+          body: fd,
+        })
+        const data = (await res.json().catch(() => ({}))) as unknown
+        if (!res.ok) {
+          setVerifyError((data as Record<string, unknown>).error as string | undefined || res.statusText)
+          return
+        }
+        const verdict = interpretDetectResponse(data)
+        setVerifyVerdict(verdict)
+      } catch (e) {
+        setVerifyError(e instanceof Error ? e.message : 'Verification failed')
+      } finally {
+        setVerifyBusy(false)
+      }
+    },
+    [exportToken],
+  )
 
   const gateBlocked =
     !hasVaultBridge && entitlementReady && (sessionUserId === null || paid === false)
@@ -606,6 +661,11 @@ export function EditorApp() {
   const ariadneBlock = hasVaultBridge && contentId ? (
     <div className="space-y-2 text-xs">
       <p className="text-[var(--muted-foreground)]">Step 1: export to vault. Step 2: add recipient key. Step 3: trace.</p>
+      <p className="rounded-md border border-[var(--border)] bg-black/20 px-2 py-1.5 text-[10px] leading-snug text-[var(--muted-foreground)]">
+        <span className="font-mono-ui uppercase tracking-[0.18em] text-[var(--circe-light)]">v1 caveat —</span>{' '}
+        survives direct file shares and most platform re-uploads. Does <strong>not</strong> survive re-encoding or
+        screenshots. v2 (re-encode-survival) is in development.
+      </p>
       <label className="block">
         <span className="text-[var(--muted-foreground)]">Recipient key</span>
         <input
@@ -626,7 +686,81 @@ export function EditorApp() {
       </button>
       {!vaultUploadOk ? <p className="text-[11px] text-[var(--muted-foreground)]">Export to vault first.</p> : null}
       {ariadneMsg ? <p className="text-[11px] text-[var(--circe-light)]">{ariadneMsg}</p> : null}
+      {tracedDownloadUrl ? (
+        <div className="mt-1 flex flex-wrap items-center gap-2 rounded-md border p-2" style={{ borderColor: 'var(--border)' }}>
+          <a
+            href={tracedDownloadUrl}
+            download
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-md px-3 py-1.5 text-[11px] font-semibold text-[var(--primary-foreground)]"
+            style={{ background: 'var(--studio-accent, var(--primary))' }}
+          >
+            Download traced copy
+          </a>
+          <button
+            type="button"
+            className="rounded-md border px-2 py-1 text-[10px]"
+            style={{ borderColor: 'var(--border)' }}
+            onClick={() => {
+              navigator.clipboard?.writeText(tracedDownloadUrl).catch(() => {})
+            }}
+          >
+            Copy link
+          </button>
+          {tracedPayloadId ? (
+            <span className="font-mono-ui text-[9px] uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+              payload {tracedPayloadId.slice(0, 8)}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
       {tracedExportEnabled ? <p className="text-[11px] text-[var(--muted-foreground)]">Traced export mode enabled.</p> : null}
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
+        <p className="mb-2 text-[11px] text-[var(--muted-foreground)]">Verify a leak</p>
+        <label className="block">
+          <input
+            type="file"
+            accept="video/*,image/*"
+            disabled={verifyBusy}
+            onChange={(e) => {
+              const file = e.currentTarget.files?.[0]
+              if (file) {
+                setVerifyVerdict(null)
+                setVerifyError(null)
+                void verifyLeak(file)
+              }
+            }}
+            className="text-[11px]"
+          />
+        </label>
+        {verifyBusy ? <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">Verifying…</p> : null}
+        {verifyError ? <p className="mt-1 text-[11px] text-red-500">{verifyError}</p> : null}
+        {verifyVerdict ? (
+          <div className="mt-2 rounded-md border border-[var(--border)] p-2">
+            {verifyVerdict.kind === 'identified' ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className="rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--primary-foreground)]"
+                  style={{ background: 'var(--primary)' }}
+                >
+                  {verifyVerdict.recipientLabel}
+                </span>
+                <span className="text-[11px] text-[var(--circe-light)]">
+                  {Math.round(verifyVerdict.confidencePct)}% confidence
+                </span>
+                {verifyVerdict.payloadIdShort ? (
+                  <span className="font-mono-ui text-[9px] uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
+                    payload {verifyVerdict.payloadIdShort}
+                  </span>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-[11px] text-[var(--muted-foreground)]">{formatVerdictLine(verifyVerdict)}</p>
+            )}
+          </div>
+        ) : null}
+      </div>
     </div>
   ) : (
     <a href={`${CREATIX}/dashboard/ai-studio/ariadne`} className="text-xs underline text-[var(--studio-accent)]">

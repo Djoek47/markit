@@ -10,6 +10,9 @@ export type TimelineSegment = {
   endSec: number
   source?: TimelineSegmentSource
   label?: string
+  speedPct?: number
+  fadeInMs?: number
+  fadeOutMs?: number
 }
 
 const STORAGE_PREFIX = 'markit-timeline-'
@@ -112,4 +115,137 @@ export function updateSegment(
 
 export function removeSegment(segments: TimelineSegment[], id: string): TimelineSegment[] {
   return segments.filter((s) => s.id !== id)
+}
+
+/** Minimum span enforced after splitting so the right half is always playable. */
+const SPLIT_MIN_SPAN_SEC = 0.1
+
+/**
+ * Split one segment in two at splitAtSec (an absolute time on the timeline).
+ * No-op when:
+ *   - id not found
+ *   - splitAtSec falls within SPLIT_MIN_SPAN_SEC of either edge (would create a sub-100ms slice)
+ *   - timeline already at TIMELINE_MAX_SEGMENTS
+ * Source/label are preserved on both halves; the right half gets a fresh id and a "(B)" label suffix.
+ */
+export function splitSegmentAtSec(
+  segments: TimelineSegment[],
+  id: string,
+  splitAtSec: number,
+): TimelineSegment[] {
+  if (!Number.isFinite(splitAtSec)) return segments
+  if (segments.length >= TIMELINE_MAX_SEGMENTS) return segments
+  const idx = segments.findIndex((s) => s.id === id)
+  if (idx < 0) return segments
+  const target = segments[idx]
+  if (splitAtSec <= target.startSec + SPLIT_MIN_SPAN_SEC) return segments
+  if (splitAtSec >= target.endSec - SPLIT_MIN_SPAN_SEC) return segments
+  const left: TimelineSegment = { ...target, endSec: splitAtSec }
+  const right: TimelineSegment = {
+    ...target,
+    id: crypto.randomUUID(),
+    startSec: splitAtSec,
+    label: target.label ? `${target.label} (B)` : undefined,
+  }
+  const next = [...segments]
+  next.splice(idx, 1, left, right)
+  return next
+}
+
+/** Edge-resize a segment by setting start or end. Clamps to neighbors / duration / min span. */
+export function resizeSegmentEdge(
+  segments: TimelineSegment[],
+  id: string,
+  edge: 'start' | 'end',
+  toSec: number,
+  durationSec: number,
+): TimelineSegment[] {
+  if (!Number.isFinite(toSec)) return segments
+  const idx = segments.findIndex((s) => s.id === id)
+  if (idx < 0) return segments
+  const seg = segments[idx]
+  const minSpan = SPLIT_MIN_SPAN_SEC
+  const d = Number.isFinite(durationSec) && durationSec > 0 ? durationSec : Math.max(seg.endSec, toSec) + minSpan
+  if (edge === 'start') {
+    const next = Math.max(0, Math.min(toSec, seg.endSec - minSpan))
+    return updateSegment(segments, id, { startSec: next })
+  }
+  const next = Math.max(seg.startSec + minSpan, Math.min(toSec, d))
+  return updateSegment(segments, id, { endSec: next })
+}
+
+/** Centered crop rect for a given aspect ratio on a frame. Aspect: 9:16, 1:1, 4:5, 16:9, 3:4, or original. */
+export function rectForAspect(aspect: string, frameAspect = 16 / 9): {
+  x: number
+  y: number
+  width: number
+  height: number
+} {
+  if (aspect === 'original') {
+    return { x: 0, y: 0, width: 1, height: 1 }
+  }
+
+  const parts = aspect.split(':')
+  if (parts.length !== 2) {
+    return { x: 0, y: 0, width: 1, height: 1 }
+  }
+
+  const w = Number(parts[0])
+  const h = Number(parts[1])
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) {
+    return { x: 0, y: 0, width: 1, height: 1 }
+  }
+
+  const targetAspect = w / h
+  let rectWidth: number
+  let rectHeight: number
+
+  if (targetAspect > frameAspect) {
+    // Target is wider than the frame — width is the binding edge.
+    rectWidth = 1
+    rectHeight = frameAspect / targetAspect
+  } else {
+    // Target is taller than (or equal to) the frame — height is the binding edge.
+    rectHeight = 1
+    rectWidth = targetAspect / frameAspect
+  }
+
+  const x = (1 - rectWidth) / 2
+  const y = (1 - rectHeight) / 2
+
+  return {
+    x: Math.max(0, Math.min(x, 1 - rectWidth)),
+    y: Math.max(0, Math.min(y, 1 - rectHeight)),
+    width: Math.min(rectWidth, 1),
+    height: Math.min(rectHeight, 1),
+  }
+}
+
+/** Patch clip properties: speed, fade in/out, label, source. Clamps speedPct to [25,400], fade to [0,5000]. */
+export function patchSegment(
+  segments: TimelineSegment[],
+  id: string,
+  patch: Partial<Pick<TimelineSegment, 'speedPct' | 'fadeInMs' | 'fadeOutMs' | 'label' | 'source'>>,
+): TimelineSegment[] {
+  const idx = segments.findIndex((s) => s.id === id)
+  if (idx < 0) return segments
+
+  const clamped: Partial<TimelineSegment> = {}
+  if ('speedPct' in patch && patch.speedPct !== undefined) {
+    clamped.speedPct = Math.max(25, Math.min(400, patch.speedPct))
+  }
+  if ('fadeInMs' in patch && patch.fadeInMs !== undefined) {
+    clamped.fadeInMs = Math.max(0, Math.min(5000, patch.fadeInMs))
+  }
+  if ('fadeOutMs' in patch && patch.fadeOutMs !== undefined) {
+    clamped.fadeOutMs = Math.max(0, Math.min(5000, patch.fadeOutMs))
+  }
+  if ('label' in patch) {
+    clamped.label = patch.label
+  }
+  if ('source' in patch) {
+    clamped.source = patch.source
+  }
+
+  return segments.map((s) => (s.id === id ? { ...s, ...clamped } : s))
 }

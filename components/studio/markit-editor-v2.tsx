@@ -10,6 +10,7 @@ import { MARKIT_OUTPUT_FORMATS, planNeedsSecondarySource } from '@/lib/markit-ed
 import { applyEditorDivineAction, makeDivineApplierContext } from '@/lib/markit-v5/divine-action-applier'
 import { useEditorShellStore } from '@/lib/stores/editor-shell-store'
 import type { TimelineSegment } from '@/lib/timeline-project'
+import { resizeSegmentEdge, splitSegmentAtSec, rectForAspect, patchSegment } from '@/lib/timeline-project'
 
 export type InspectorTab = 'clip' | 'crop' | 'trim' | 'export' | 'trace'
 
@@ -192,9 +193,9 @@ function toTimelineClip(seg: TimelineSegment): TimelineClip {
     out: seg.endSec,
     volume: 1,
     opacity: 1,
-    speed: 1,
-    fadeInMs: 0,
-    fadeOutMs: 0,
+    speed: (seg.speedPct ?? 100) / 100,
+    fadeInMs: seg.fadeInMs ?? 0,
+    fadeOutMs: seg.fadeOutMs ?? 0,
     source: seg.source === 'secondary' ? 'secondary' : 'primary',
     label: seg.label,
   }
@@ -366,6 +367,7 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
   }, [auxClips, duration, timelineSegments])
 
   const selectedClip = timeline.clips.find((x) => x.id === selectedClipId) || null
+  const v1SelectedClip = selectedClip && selectedClip.trackId === 'v1' ? selectedClip : null
 
   const setV1Clips = useCallback(
     (clips: TimelineClip[]) => {
@@ -881,11 +883,12 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
                           </option>
                         </select>
                       </label>
-                      <div className="pro-only space-y-2 border-t pt-3" style={{ borderColor: 'var(--border-soft)' }}>
+                      {v1SelectedClip ? <div className="pro-only space-y-2 border-t pt-3" style={{ borderColor: 'var(--border-soft)' }}>
                         <p className="font-mono-ui text-[9px] uppercase tracking-[0.18em] text-[var(--muted-foreground)]">Speed / fade</p>
-                        <input type="range" min={25} max={400} defaultValue={100} aria-label="Speed" />
-                        <input type="range" min={0} max={100} defaultValue={0} aria-label="Fade" />
-                      </div>
+                        <label className="block"><span className="text-[10px]">{Math.round(v1SelectedClip.speed * 100)}%</span><input type="range" min={25} max={400} step={1} value={Math.round(v1SelectedClip.speed * 100)} onChange={(e) => onTimelineSegmentsChange(patchSegment(timelineSegments, v1SelectedClip.id, { speedPct: Number(e.target.value) }))} /></label>
+                        <label className="block"><span className="text-[10px]">{v1SelectedClip.fadeInMs}ms</span><input type="range" min={0} max={5000} step={50} value={v1SelectedClip.fadeInMs} onChange={(e) => onTimelineSegmentsChange(patchSegment(timelineSegments, v1SelectedClip.id, { fadeInMs: Number(e.target.value) }))} /></label>
+                        <label className="block"><span className="text-[10px]">{v1SelectedClip.fadeOutMs}ms</span><input type="range" min={0} max={5000} step={50} value={v1SelectedClip.fadeOutMs} onChange={(e) => onTimelineSegmentsChange(patchSegment(timelineSegments, v1SelectedClip.id, { fadeOutMs: Number(e.target.value) }))} /></label>
+                      </div> : null}
                     </div>
                   ) : null}
                 </div>
@@ -898,18 +901,18 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
                   </h4>
                   <p className="mk-desc">Normalized rectangle applied on export.</p>
                   <div className="simple-only mb-3 flex flex-wrap gap-1">
-                    {(['9:16', '1:1', '4:5'] as const).map((r) => (
-                      <button key={r} type="button" className="rounded-full border px-2 py-1 font-mono-ui text-[9px] uppercase tracking-wide text-[var(--muted-foreground)]" style={{ borderColor: 'var(--border)' }}>
-                        {r}
-                      </button>
-                    ))}
+                    {(['9:16', '1:1', '4:5'] as const).map((r) => {
+                      const isActive = JSON.stringify(cropRect) === JSON.stringify(rectForAspect(r))
+                      return <button key={r} type="button" className="rounded-full border px-2 py-1 font-mono-ui text-[9px] uppercase tracking-wide" style={{ borderColor: isActive ? 'var(--primary)' : 'var(--border)', color: isActive ? 'var(--foreground)' : 'var(--muted-foreground)' }} onClick={() => onCropRectChange(rectForAspect(r))}>{r}</button>
+                    })}
+                    <button type="button" className="rounded-full border px-2 py-1 font-mono-ui text-[9px] uppercase tracking-wide" style={{ borderColor: cropRect.x === 0 && cropRect.y === 0 && cropRect.width === 1 && cropRect.height === 1 ? 'var(--primary)' : 'var(--border)', color: cropRect.x === 0 && cropRect.y === 0 && cropRect.width === 1 && cropRect.height === 1 ? 'var(--foreground)' : 'var(--muted-foreground)' }} onClick={() => onCropRectChange(rectForAspect('original'))}>Original</button>
                   </div>
                   <div className="pro-only mb-3 flex flex-wrap gap-1">
-                    {(['9:16', '1:1', '4:5', '16:9', '3:4'] as const).map((r) => (
-                      <button key={r} type="button" className="rounded-full border px-2 py-1 font-mono-ui text-[9px] uppercase tracking-wide text-[var(--muted-foreground)]" style={{ borderColor: 'var(--border)' }}>
-                        {r}
-                      </button>
-                    ))}
+                    {(['9:16', '1:1', '4:5', '16:9', '3:4'] as const).map((r) => {
+                      const isActive = JSON.stringify(cropRect) === JSON.stringify(rectForAspect(r))
+                      return <button key={r} type="button" className="rounded-full border px-2 py-1 font-mono-ui text-[9px] uppercase tracking-wide" style={{ borderColor: isActive ? 'var(--primary)' : 'var(--border)', color: isActive ? 'var(--foreground)' : 'var(--muted-foreground)' }} onClick={() => onCropRectChange(rectForAspect(r))}>{r}</button>
+                    })}
+                    <button type="button" className="rounded-full border px-2 py-1 font-mono-ui text-[9px] uppercase tracking-wide" style={{ borderColor: cropRect.x === 0 && cropRect.y === 0 && cropRect.width === 1 && cropRect.height === 1 ? 'var(--primary)' : 'var(--border)', color: cropRect.x === 0 && cropRect.y === 0 && cropRect.width === 1 && cropRect.height === 1 ? 'var(--foreground)' : 'var(--muted-foreground)' }} onClick={() => onCropRectChange(rectForAspect('original'))}>Original</button>
                   </div>
                   {(
                     [

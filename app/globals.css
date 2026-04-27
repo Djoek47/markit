@@ -1259,3 +1259,44 @@ input[type='range'] {
 .mkt-welcome-still * {
   animation: none !important;
 }
+
+/* ── trim handles on V1 clips ── */
+.markit-shell .mk-clip {
+  /* Allow handles to sit at the very edges */
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.markit-shell .mk-trim-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+  background: color-mix(in oklch, var(--foreground) 25%, transparent);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+  touch-action: none;
+}
+
+.markit-shell .mk-trim-handle.mk-trim-left {
+  left: 0;
+  border-top-left-radius: 3px;
+  border-bottom-left-radius: 3px;
+}
+
+.markit-shell .mk-trim-handle.mk-trim-right {
+  right: 0;
+  border-top-right-radius: 3px;
+  border-bottom-right-radius: 3px;
+}
+
+.markit-shell .mk-clip:hover .mk-trim-handle,
+.markit-shell .mk-clip.mk-selected .mk-trim-handle {
+  opacity: 0.85;
+}
+
+.markit-shell .mk-trim-handle:hover {
+  opacity: 1 !important;
+  background: var(--foreground);
+}
