@@ -1733,7 +1733,7 @@ export const Preview: React.FC = () => {
       if (!ctx) return;
 
       const emptyBg = isDark ? "#0f0f11" : "#ffffff";
-      const emptyText = isDark ? "#52525b" : "#a1a1aa";
+      const emptyText = isDark ? "#9f9ca6" : "#6f6878";
       const textPrimary = isDark ? "#ffffff" : "#18181b";
       const textSecondary = isDark ? "#a1a1aa" : "#71717a";
 
@@ -1876,7 +1876,7 @@ export const Preview: React.FC = () => {
         !hasActiveAudioClip
       ) {
         ctx.fillStyle = emptyText;
-        ctx.font = "24px Inter, sans-serif";
+        ctx.font = "500 28px DM Sans, Inter, sans-serif";
         ctx.textAlign = "center";
         ctx.fillText(
           "Import media to get started",

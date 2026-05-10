@@ -33,13 +33,13 @@ export const Playhead: React.FC<PlayheadProps> = ({
           viewBox="0 0 13 14"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          className="drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]"
+          className="text-primary"
         >
-          <path d="M0.5 0H12.5V8L6.5 14L0.5 8V0Z" fill="#22c55e" />
+          <path d="M0.5 0H12.5V8L6.5 14L0.5 8V0Z" fill="currentColor" />
         </svg>
       </div>
       <div
-        className="absolute w-px bg-primary shadow-[0_0_10px_#22c55e]"
+        className="absolute w-px bg-primary"
         style={{ top: '13px', bottom: 0, left: 0 }}
       />
     </div>

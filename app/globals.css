@@ -123,6 +123,327 @@
   box-shadow: 0 0 0 1px rgb(210 175 98);
 }
 
+/* OpenReel inside Markit: premium Circe studio skin.
+   Keep the editor mechanics intact; refine the surface, rhythm, and color. */
+.openreel-markit {
+  --mk-studio-black: 8 8 9;
+  --mk-studio-rail: 12 12 14;
+  --mk-studio-panel: 17 17 20;
+  --mk-studio-elevated: 24 24 28;
+  --mk-studio-hover: 31 31 36;
+  --mk-ivory: 244 241 235;
+  --mk-muted: 159 156 166;
+  --mk-faint: 102 99 111;
+  --mk-line: 255 255 255 / 0.075;
+  --mk-line-strong: 255 255 255 / 0.14;
+  --mk-gold: 219 183 102;
+  --mk-gold-soft: 232 205 141;
+  --mk-circe: 143 99 206;
+  --mk-circe-soft: 181 145 232;
+  --background: 0 0% 3%;
+  --foreground: 40 22% 94%;
+  --card: 240 8% 7%;
+  --card-foreground: 40 22% 94%;
+  --popover: 240 8% 8%;
+  --popover-foreground: 40 22% 94%;
+  --primary: 42 60% 63%;
+  --primary-foreground: 240 8% 5%;
+  --secondary: 250 8% 12%;
+  --secondary-foreground: 40 22% 94%;
+  --muted: 250 7% 13%;
+  --muted-foreground: 255 8% 64%;
+  --accent: 268 52% 62%;
+  --accent-foreground: 40 22% 94%;
+  --border: 255 255 255 / 0.075;
+  --input: 255 255 255 / 0.1;
+  --ring: 42 60% 63%;
+  --color-background: var(--mk-studio-black);
+  --color-background-secondary: var(--mk-studio-rail);
+  --color-background-tertiary: var(--mk-studio-panel);
+  --color-background-elevated: var(--mk-studio-elevated);
+  --color-text-primary: var(--mk-ivory);
+  --color-text-secondary: var(--mk-muted);
+  --color-text-muted: var(--mk-faint);
+  --color-border: 255 255 255 / 0.075;
+  --color-border-hover: 255 255 255 / 0.14;
+  --color-border-active: var(--mk-gold);
+  background: rgb(var(--mk-studio-black));
+  font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.openreel-markit *,
+.openreel-markit *::before,
+.openreel-markit *::after {
+  letter-spacing: 0;
+}
+
+.openreel-markit :where(.bg-background) {
+  background-color: rgb(var(--mk-studio-black)) !important;
+}
+
+.openreel-markit :where(.bg-background-secondary) {
+  background-color: rgb(var(--mk-studio-rail)) !important;
+}
+
+.openreel-markit :where(.bg-background-tertiary) {
+  background-color: rgb(var(--mk-studio-panel)) !important;
+}
+
+.openreel-markit :where(.bg-background-elevated) {
+  background-color: rgb(var(--mk-studio-elevated)) !important;
+}
+
+.openreel-markit :where(.border-border) {
+  border-color: rgb(var(--mk-line)) !important;
+}
+
+.openreel-markit :where(.text-text-primary) {
+  color: rgb(var(--mk-ivory)) !important;
+}
+
+.openreel-markit :where(.text-text-secondary) {
+  color: rgb(var(--mk-muted)) !important;
+}
+
+.openreel-markit :where(.text-text-muted) {
+  color: rgb(var(--mk-faint)) !important;
+}
+
+.openreel-markit :where(.text-primary) {
+  color: rgb(var(--mk-gold)) !important;
+}
+
+.openreel-markit :where(.bg-primary) {
+  background-color: rgb(var(--mk-gold)) !important;
+}
+
+.openreel-markit :where(.border-primary) {
+  border-color: rgb(var(--mk-gold)) !important;
+}
+
+.openreel-markit :where(.ring-primary, .ring-primary\/30, .ring-primary\/50) {
+  --tw-ring-color: rgb(var(--mk-gold) / 0.35) !important;
+}
+
+.openreel-markit :where(button, input, textarea, select, [role='button']) {
+  border-radius: 8px;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.openreel-markit :where(button):focus-visible,
+.openreel-markit :where(input, textarea, select):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px rgb(var(--mk-gold) / 0.7), 0 0 0 5px rgb(var(--mk-gold) / 0.12);
+}
+
+.openreel-markit :where(.shadow-lg, .shadow-xl, .shadow-2xl, .shadow-inner, .shadow-sm) {
+  box-shadow: none !important;
+}
+
+.openreel-markit [class*='shadow-\[0_0'],
+.openreel-markit [class*='shadow-\[0_-'],
+.openreel-markit [class*='shadow-\[0_0_20px'],
+.openreel-markit [class*='shadow-\[0_0_30px'] {
+  box-shadow: none !important;
+}
+
+.openreel-markit :where(.rounded-2xl, .rounded-xl, .rounded-lg) {
+  border-radius: 8px !important;
+}
+
+.openreel-markit :where(.h-16.border-b) {
+  min-height: 60px;
+  height: 60px;
+  padding-left: 18px;
+  padding-right: 18px;
+  background: rgb(var(--mk-studio-black) / 0.92) !important;
+  border-bottom-color: rgb(var(--mk-line)) !important;
+  backdrop-filter: blur(18px) saturate(1.15);
+}
+
+.openreel-markit :where(.h-16.border-b) svg {
+  stroke-width: 1.8;
+}
+
+.openreel-markit :where(.h-16.border-b) button:hover {
+  background-color: rgb(var(--mk-studio-hover) / 0.72) !important;
+}
+
+.openreel-markit :where(.h-16.border-b) .text-lg {
+  font-family: var(--font-cinzel), ui-serif, Georgia, serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: rgb(var(--mk-ivory)) !important;
+}
+
+.openreel-markit :where(.w-80.bg-background-secondary.border-r, .w-80.bg-background-secondary.border-l) {
+  width: 304px;
+  background: rgb(var(--mk-studio-rail)) !important;
+}
+
+.openreel-markit :where(.w-80.bg-background-secondary.border-r) {
+  border-right-color: rgb(var(--mk-line)) !important;
+}
+
+.openreel-markit :where(.w-80.bg-background-secondary.border-l) {
+  border-left-color: rgb(var(--mk-line)) !important;
+}
+
+.openreel-markit :where(.font-bold) {
+  font-weight: 600;
+}
+
+.openreel-markit :where(.text-lg.font-bold, h3.text-sm.font-bold) {
+  font-family: var(--font-cinzel), ui-serif, Georgia, serif;
+  font-weight: 500;
+}
+
+.openreel-markit :where(input, textarea) {
+  background-color: rgb(var(--mk-studio-panel)) !important;
+  border-color: rgb(var(--mk-line)) !important;
+  color: rgb(var(--mk-ivory)) !important;
+}
+
+.openreel-markit :where(input::placeholder, textarea::placeholder) {
+  color: rgb(var(--mk-faint)) !important;
+}
+
+.openreel-markit :where(input:focus, textarea:focus) {
+  border-color: rgb(var(--mk-gold) / 0.7) !important;
+  box-shadow: 0 0 0 1px rgb(var(--mk-gold) / 0.55) !important;
+}
+
+.openreel-markit :where(.bg-primary\/10) {
+  background-color: rgb(var(--mk-gold) / 0.08) !important;
+}
+
+.openreel-markit :where(.bg-primary\/20) {
+  background-color: rgb(var(--mk-gold) / 0.12) !important;
+}
+
+.openreel-markit :where(.bg-primary\/30) {
+  background-color: rgb(var(--mk-gold) / 0.18) !important;
+}
+
+.openreel-markit :where(.border-primary\/20, .border-primary\/30, .border-primary\/50) {
+  border-color: rgb(var(--mk-gold) / 0.28) !important;
+}
+
+.openreel-markit :where(.hover\:bg-primary\/20:hover, .hover\:bg-primary\/40:hover) {
+  background-color: rgb(var(--mk-gold) / 0.16) !important;
+}
+
+.openreel-markit :where(.hover\:border-primary\/50:hover, .group:hover .group-hover\:border-primary\/50) {
+  border-color: rgb(var(--mk-gold) / 0.4) !important;
+}
+
+.openreel-markit :where(.hover\:text-primary:hover, .group:hover .group-hover\:text-primary) {
+  color: rgb(var(--mk-gold)) !important;
+}
+
+.openreel-markit :where(.text-white) {
+  color: rgb(var(--mk-ivory)) !important;
+}
+
+.openreel-markit :where(.text-black) {
+  color: rgb(var(--mk-studio-black)) !important;
+}
+
+.openreel-markit :where(.bg-green-500, .bg-cyan-500, .bg-yellow-500) {
+  background-color: rgb(var(--mk-gold)) !important;
+}
+
+.openreel-markit :where(.bg-green-400, .bg-cyan-400, .bg-yellow-400) {
+  background-color: rgb(var(--mk-gold-soft)) !important;
+}
+
+.openreel-markit :where(.bg-green-500\/80, .bg-cyan-500\/80) {
+  background-color: rgb(var(--mk-gold) / 0.86) !important;
+}
+
+.openreel-markit :where(.bg-green-500\/10, .bg-green-500\/20, .bg-green-500\/30, .bg-cyan-500\/10, .bg-cyan-500\/20, .bg-cyan-500\/30) {
+  background-color: rgb(var(--mk-gold) / 0.12) !important;
+}
+
+.openreel-markit :where(.border-green-500, .border-cyan-500, .border-yellow-500) {
+  border-color: rgb(var(--mk-gold)) !important;
+}
+
+.openreel-markit :where(.border-green-400, .border-cyan-400, .border-yellow-400, .border-green-500\/20, .border-green-500\/30, .border-green-500\/50) {
+  border-color: rgb(var(--mk-gold) / 0.42) !important;
+}
+
+.openreel-markit :where(.text-green-500, .text-green-400, .text-green-300, .text-cyan-500, .text-cyan-400, .text-yellow-500, .text-yellow-400) {
+  color: rgb(var(--mk-gold)) !important;
+}
+
+.openreel-markit :where(.text-blue-400) {
+  color: rgb(var(--mk-circe-soft)) !important;
+}
+
+.openreel-markit :where(.hover\:bg-green-500:hover, .hover\:bg-cyan-500:hover, .hover\:bg-yellow-500:hover) {
+  background-color: rgb(var(--mk-gold-soft)) !important;
+}
+
+.openreel-markit :where(.animate-pulse) {
+  animation-duration: 2.6s;
+}
+
+.openreel-markit :where(.fixed.inset-0, [role='dialog']) {
+  backdrop-filter: blur(18px);
+}
+
+.openreel-markit :where([role='dialog'], .rounded-xl.bg-background-secondary, .rounded-lg.bg-background-secondary) {
+  border-color: rgb(var(--mk-line-strong)) !important;
+  background-color: rgb(var(--mk-studio-panel)) !important;
+}
+
+.openreel-markit :where(.custom-scrollbar) {
+  scrollbar-color: rgb(var(--mk-faint) / 0.55) transparent;
+  scrollbar-width: thin;
+}
+
+.openreel-markit :where(.custom-scrollbar::-webkit-scrollbar) {
+  width: 7px;
+  height: 7px;
+}
+
+.openreel-markit :where(.custom-scrollbar::-webkit-scrollbar-thumb) {
+  background: rgb(var(--mk-faint) / 0.45);
+  border-radius: 999px;
+}
+
+.openreel-markit :where(.h-12.border-b) {
+  height: 48px;
+  background-color: rgb(var(--mk-studio-rail)) !important;
+}
+
+.openreel-markit :where(.font-mono.text-primary) {
+  font-weight: 500;
+  color: rgb(var(--mk-gold-soft)) !important;
+}
+
+.openreel-markit canvas {
+  background: #000;
+}
+
+.openreel-markit :where(.aspect-video.bg-background-tertiary) {
+  background: rgb(var(--mk-studio-panel)) !important;
+}
+
+.openreel-markit :where(.fixed.top-16.right-0.bottom-0) {
+  top: 60px;
+  background-color: rgb(var(--mk-studio-panel)) !important;
+  border-left-color: rgb(var(--mk-line)) !important;
+}
+
 html {
   color-scheme: dark;
 }
