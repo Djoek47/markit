@@ -10,6 +10,7 @@ const eslintConfig = defineConfig([
     // Default ignores of eslint-config-next:
     ".next/**",
     ".claude/**",
+    "vendor/openreel/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

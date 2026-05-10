@@ -13,6 +13,7 @@ const config = {
     exclude: [
       '**/node_modules/**',
       '**/.next/**',
+      'vendor/openreel/**',
       'lib/detect-api-adapter.test.ts',
       'lib/detect-contract.test.ts',
       'lib/divine-action-applier.test.ts',
