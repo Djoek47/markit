@@ -444,6 +444,199 @@
   border-left-color: rgb(var(--mk-line)) !important;
 }
 
+/* Portaled editor surfaces: Radix renders these outside `.openreel-markit`. */
+body.markit-editor-active {
+  --mk-studio-black: 8 8 9;
+  --mk-studio-rail: 12 12 14;
+  --mk-studio-panel: 17 17 20;
+  --mk-studio-elevated: 24 24 28;
+  --mk-studio-hover: 31 31 36;
+  --mk-ivory: 244 241 235;
+  --mk-muted: 159 156 166;
+  --mk-faint: 102 99 111;
+  --mk-line: 255 255 255 / 0.075;
+  --mk-line-strong: 255 255 255 / 0.14;
+  --mk-gold: 219 183 102;
+  --mk-gold-soft: 232 205 141;
+  --mk-circe: 143 99 206;
+  --mk-circe-soft: 181 145 232;
+  --popover: 240 8% 8%;
+  --popover-foreground: 40 22% 94%;
+  --accent: 42 60% 63%;
+  --accent-foreground: 240 8% 5%;
+  --muted: 250 7% 13%;
+  --muted-foreground: 255 8% 64%;
+  --border: 255 255 255 / 0.075;
+  --ring: 42 60% 63%;
+}
+
+body.markit-editor-active :where([role='menu'], [role='listbox'], [data-radix-popper-content-wrapper] > div) {
+  background-color: rgb(var(--mk-studio-panel) / 0.98) !important;
+  color: rgb(var(--mk-ivory)) !important;
+  border: 1px solid rgb(var(--mk-line-strong)) !important;
+  border-radius: 10px !important;
+  box-shadow:
+    0 18px 50px rgb(0 0 0 / 0.42),
+    0 1px 0 rgb(255 255 255 / 0.04) inset !important;
+  backdrop-filter: blur(18px) saturate(1.12);
+}
+
+body.markit-editor-active :where([role='menu'], [role='listbox']) {
+  padding: 6px !important;
+  scrollbar-color: rgb(var(--mk-faint) / 0.65) transparent;
+  scrollbar-width: thin;
+}
+
+body.markit-editor-active :where([role='menu'], [role='listbox'], [role='dialog'])::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+body.markit-editor-active :where([role='menu'], [role='listbox'], [role='dialog'])::-webkit-scrollbar-thumb {
+  background: rgb(var(--mk-faint) / 0.56);
+  border-radius: 999px;
+}
+
+body.markit-editor-active :where([role='menu'], [role='listbox'], [role='dialog'])::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body.markit-editor-active :where([role='menuitem'], [role='option'], [role='menuitemcheckbox'], [role='menuitemradio']) {
+  min-height: 32px;
+  border-radius: 7px !important;
+  color: rgb(var(--mk-muted)) !important;
+  font-size: 12px !important;
+  font-weight: 500;
+  outline: none;
+}
+
+body.markit-editor-active :where([role='menuitem'] svg, [role='option'] svg, [role='menuitemcheckbox'] svg, [role='menuitemradio'] svg) {
+  color: rgb(var(--mk-faint)) !important;
+  stroke-width: 1.8;
+}
+
+body.markit-editor-active :where([role='menuitem']:hover, [role='menuitem']:focus, [role='option']:hover, [role='option']:focus, [role='menuitemcheckbox']:hover, [role='menuitemcheckbox']:focus, [role='menuitemradio']:hover, [role='menuitemradio']:focus, [data-highlighted]) {
+  background-color: rgb(var(--mk-gold) / 0.11) !important;
+  color: rgb(var(--mk-ivory)) !important;
+}
+
+body.markit-editor-active :where([role='menuitem']:hover svg, [role='menuitem']:focus svg, [role='option']:hover svg, [role='option']:focus svg, [data-highlighted] svg) {
+  color: rgb(var(--mk-gold)) !important;
+}
+
+body.markit-editor-active :where([role='menuitem'][data-disabled], [role='option'][data-disabled]) {
+  opacity: 0.38 !important;
+}
+
+body.markit-editor-active :where([role='separator']) {
+  background-color: rgb(var(--mk-line)) !important;
+  margin: 6px -2px !important;
+}
+
+body.markit-editor-active :where([role='menu'] [class*='text-red'], [role='menuitem'].text-red-400) {
+  color: rgb(235 116 116) !important;
+}
+
+body.markit-editor-active :where([role='menu'] [class*='text-red']:hover, [role='menuitem'].text-red-400:hover, [role='menuitem'].text-red-400:focus) {
+  background-color: rgb(235 116 116 / 0.1) !important;
+  color: rgb(255 150 150) !important;
+}
+
+body.markit-editor-active :where([role='tooltip']) {
+  background-color: rgb(var(--mk-studio-elevated) / 0.98) !important;
+  color: rgb(var(--mk-ivory)) !important;
+  border: 1px solid rgb(var(--mk-line-strong)) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 14px 36px rgb(0 0 0 / 0.38) !important;
+  font-size: 11px !important;
+  font-weight: 500;
+  padding: 7px 10px !important;
+  backdrop-filter: blur(14px) saturate(1.1);
+}
+
+body.markit-editor-active :where([data-radix-dialog-overlay]) {
+  background: rgb(0 0 0 / 0.72) !important;
+  backdrop-filter: blur(18px) saturate(1.05);
+}
+
+body.markit-editor-active :where([role='dialog']) {
+  background-color: rgb(var(--mk-studio-panel)) !important;
+  color: rgb(var(--mk-ivory)) !important;
+  border: 1px solid rgb(var(--mk-line-strong)) !important;
+  border-radius: 14px !important;
+  box-shadow:
+    0 28px 90px rgb(0 0 0 / 0.58),
+    0 1px 0 rgb(255 255 255 / 0.04) inset !important;
+}
+
+body.markit-editor-active :where([role='dialog'] h1, [role='dialog'] h2, [role='dialog'] h3, [role='dialog'] [data-radix-dialog-title]) {
+  font-family: var(--font-cinzel), ui-serif, Georgia, serif;
+  font-weight: 500 !important;
+  color: rgb(var(--mk-ivory)) !important;
+}
+
+body.markit-editor-active :where([role='dialog'] p, [role='dialog'] label, [role='dialog'] span) {
+  letter-spacing: 0;
+}
+
+body.markit-editor-active :where([role='dialog'] input, [role='dialog'] textarea, [role='dialog'] button[role='combobox']) {
+  background-color: rgb(var(--mk-studio-elevated)) !important;
+  border-color: rgb(var(--mk-line)) !important;
+  color: rgb(var(--mk-ivory)) !important;
+  border-radius: 8px !important;
+}
+
+body.markit-editor-active :where([role='dialog'] input:focus, [role='dialog'] textarea:focus, [role='dialog'] button[role='combobox']:focus) {
+  border-color: rgb(var(--mk-gold) / 0.65) !important;
+  box-shadow: 0 0 0 1px rgb(var(--mk-gold) / 0.5) !important;
+  outline: none !important;
+}
+
+body.markit-editor-active :where([role='dialog'] button) {
+  border-radius: 8px !important;
+}
+
+body.markit-editor-active :where([role='dialog'] .bg-primary, [role='dialog'] button.bg-primary) {
+  background-color: rgb(var(--mk-gold)) !important;
+  color: rgb(var(--mk-studio-black)) !important;
+}
+
+body.markit-editor-active :where([role='dialog'] .text-primary) {
+  color: rgb(var(--mk-gold)) !important;
+}
+
+body.markit-editor-active :where([role='dialog'] .border-primary, [role='dialog'] .border-primary\/30, [role='dialog'] .border-primary\/50) {
+  border-color: rgb(var(--mk-gold) / 0.35) !important;
+}
+
+body.markit-editor-active :where([role='dialog'] .bg-background, [role='dialog'] .bg-background-secondary, [role='dialog'] .bg-background-tertiary) {
+  background-color: rgb(var(--mk-studio-elevated)) !important;
+}
+
+body.markit-editor-active :where([role='dialog'] .border-border) {
+  border-color: rgb(var(--mk-line)) !important;
+}
+
+body.markit-editor-active :where([role='dialog'] .text-text-secondary, [role='dialog'] .text-muted-foreground) {
+  color: rgb(var(--mk-muted)) !important;
+}
+
+body.markit-editor-active :where([role='dialog'] .text-text-muted) {
+  color: rgb(var(--mk-faint)) !important;
+}
+
+body.markit-editor-active :where([role='dialog'] .shadow-lg, [role='dialog'] .shadow-xl, [role='dialog'] .shadow-2xl, [role='dialog'] [class*='shadow-\[0_0']) {
+  box-shadow: none !important;
+}
+
+body.markit-editor-active :where([data-radix-popper-content-wrapper] .bg-green-500, [data-radix-popper-content-wrapper] .bg-cyan-500, [data-radix-popper-content-wrapper] .bg-yellow-500) {
+  background-color: rgb(var(--mk-gold)) !important;
+}
+
+body.markit-editor-active :where([data-radix-popper-content-wrapper] .text-green-400, [data-radix-popper-content-wrapper] .text-green-500, [data-radix-popper-content-wrapper] .text-cyan-400, [data-radix-popper-content-wrapper] .text-yellow-500) {
+  color: rgb(var(--mk-gold)) !important;
+}
+
 html {
   color-scheme: dark;
 }
