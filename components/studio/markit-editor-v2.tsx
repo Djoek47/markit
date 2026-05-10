@@ -10,7 +10,7 @@ import { MARKIT_OUTPUT_FORMATS, planNeedsSecondarySource } from '@/lib/markit-ed
 import { applyEditorDivineAction, makeDivineApplierContext } from '@/lib/markit-v5/divine-action-applier'
 import { useEditorShellStore } from '@/lib/stores/editor-shell-store'
 import type { TimelineSegment } from '@/lib/timeline-project'
-import { resizeSegmentEdge, splitSegmentAtSec, rectForAspect, patchSegment } from '@/lib/timeline-project'
+import { splitSegmentAtSec, rectForAspect, patchSegment } from '@/lib/timeline-project'
 
 export type InspectorTab = 'clip' | 'crop' | 'trim' | 'export' | 'trace'
 
@@ -650,7 +650,16 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
               <button type="button" className="pro-only mk-btn">
                 Snap
               </button>
-              <button type="button" className="pro-only mk-btn">
+              <button
+                type="button"
+                className="pro-only mk-btn"
+                disabled={!v1SelectedClip}
+                onClick={() => {
+                  if (!v1SelectedClip) return
+                  const splitAt = Math.max(v1SelectedClip.start + 0.1, Math.min(currentTime, v1SelectedClip.out - 0.1))
+                  onTimelineSegmentsChange(splitSegmentAtSec(timelineSegments, v1SelectedClip.id, splitAt))
+                }}
+              >
                 Split
               </button>
               <span className="mk-spacer" />

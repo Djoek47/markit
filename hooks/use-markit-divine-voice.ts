@@ -6,7 +6,6 @@ import {
   extractRealtimeFunctionCallId,
   injectToolResultFallback,
   isRealtimeUserSpeechEvent,
-  summarizeVoiceToolArgs,
   triggerRealtimeAssistantResponse,
 } from '@/lib/realtime-voice-helpers'
 
@@ -387,8 +386,6 @@ export function useMarkitDivineVoice(opts: {
       setStatus('error')
     }
   }, [endVoiceCall, opts.enabled, opts.importUrl, opts.timelineSummary])
-
-  scheduleIdleDisconnectRef.current = () => {}
 
   return {
     status,
