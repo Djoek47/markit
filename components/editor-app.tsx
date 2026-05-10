@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { UIMessage } from 'ai'
 import { createClient } from '@/lib/supabase/client'
-import { isMarkitEditorEntitled } from '@/lib/billing'
 import { hasDivineVoicePremium } from '@/lib/premium-divine'
 import { useDivineActionStream } from '@/hooks/use-divine-action-stream'
 import { useMarkitDivineVoice } from '@/hooks/use-markit-divine-voice'
@@ -67,7 +66,6 @@ export function EditorApp() {
   const hasEditableSource = Boolean(activeImportUrl)
 
   const [sessionUserId, setSessionUserId] = useState<string | null>(null)
-  const [paid, setPaid] = useState<boolean | null>(null)
   const [divineVoicePremium, setDivineVoicePremium] = useState<boolean | null>(null)
   const [authReady, setAuthReady] = useState(!HAS_SUPABASE_BROWSER_ENV)
   const [entitlementReady, setEntitlementReady] = useState(!HAS_SUPABASE_BROWSER_ENV)
@@ -93,14 +91,12 @@ export function EditorApp() {
   useEffect(() => {
     if (!authReady) return
     if (!sessionUserId) {
-      setPaid(null)
       setDivineVoicePremium(null)
       setEntitlementReady(true)
       return
     }
     setEntitlementReady(false)
     if (!HAS_SUPABASE_BROWSER_ENV) {
-      setPaid(null)
       setDivineVoicePremium(null)
       setEntitlementReady(true)
       return
@@ -116,7 +112,6 @@ export function EditorApp() {
         if (error) {
           console.warn('[markit] subscriptions read failed', error.message)
         }
-        setPaid(isMarkitEditorEntitled(data))
         setDivineVoicePremium(hasDivineVoicePremium(data))
         setEntitlementReady(true)
       })
@@ -655,20 +650,15 @@ export function EditorApp() {
     [exportToken],
   )
 
-  const gateBlocked =
-    !hasVaultBridge && !hasEditableSource && entitlementReady && sessionUserId !== null && paid === false
-
   const onSignOut = useCallback(async () => {
     if (!HAS_SUPABASE_BROWSER_ENV) {
       setSessionUserId(null)
-      setPaid(null)
       setDivineVoicePremium(null)
       router.replace('/')
       return
     }
     await createClient().auth.signOut()
     setSessionUserId(null)
-    setPaid(null)
     setDivineVoicePremium(null)
     router.replace('/')
   }, [router])
@@ -867,7 +857,7 @@ export function EditorApp() {
     )
   }
 
-  if (gateBlocked) {
+  if (process.env.NEXT_PUBLIC_MARKIT_REQUIRE_SUBSCRIPTION === 'true') {
     return (
       <div className="flex min-h-[100dvh] flex-col bg-[var(--background)] px-4 py-16 text-[var(--foreground)]">
         <div className="mx-auto max-w-lg text-center">
