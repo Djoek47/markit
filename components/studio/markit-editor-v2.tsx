@@ -521,6 +521,9 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
           </div>
         </div>
         <div className="mk-h-right">
+          <Link href="/library" className="mk-btn mk-btn-ghost">
+            Library
+          </Link>
           <a href={`${creatixUrl}/dashboard/ai-studio`} className="mk-btn">
             Vault
           </a>
