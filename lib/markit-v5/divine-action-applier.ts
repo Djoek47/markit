@@ -10,7 +10,7 @@ import {
 } from '@/lib/timeline-project'
 import type { TimelineSegment } from '@/lib/timeline-project'
 
-type InspectorTab = 'clip' | 'crop' | 'trim' | 'export' | 'trace'
+type InspectorTab = 'clip' | 'crop' | 'trim' | 'export' | 'trace' | 'leaks'
 
 export type DivineApplierContext = {
   setInspectorTab: (t: InspectorTab) => void
@@ -24,6 +24,8 @@ export type DivineApplierContext = {
   setCropRect?: (rect: { x: number; y: number; width: number; height: number }) => void
   /** Source video duration — used to clamp split/trim. */
   durationSec?: number
+  /** DMCA action handler — fire-and-forget; caller owns the API call + state update. */
+  onDmcaAction?: (leakViewId: string, action: 'generate' | 'send') => void
 }
 
 /**
@@ -141,6 +143,14 @@ export function applyEditorDivineAction(
       ctx.setSegments(patchSegment(segs, action.segmentId, fadePatch))
       return
     }
+
+    case 'vault_generate_dmca':
+      ctx.onDmcaAction?.(action.leakViewId, 'generate')
+      return
+
+    case 'vault_send_dmca':
+      ctx.onDmcaAction?.(action.leakViewId, 'send')
+      return
 
     default:
       return

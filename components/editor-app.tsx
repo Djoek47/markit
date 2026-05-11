@@ -131,6 +131,31 @@ export function EditorApp() {
       .catch(() => {})
   }, [])
 
+  const handleDmcaAction = useCallback((leakViewId: string, action: 'generate' | 'send') => {
+    const endpoint = action === 'generate' ? '/api/dmca/generate' : '/api/dmca/send'
+    void fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leakViewId }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body: { ok?: boolean; draftId?: string } | null) => {
+        if (!body?.ok) return
+        setLeakAlerts((prev) =>
+          prev?.map((a) =>
+            a.id === leakViewId
+              ? {
+                  ...a,
+                  dmcaState: action === 'generate' ? ('drafted' as const) : ('sent' as const),
+                  ...(action === 'generate' && body.draftId ? { dmcaDraftId: body.draftId } : {}),
+                }
+              : a,
+          ),
+        )
+      })
+      .catch(() => {})
+  }, [])
+
   const handleLeakAction = useCallback((id: string, action: 'view' | 'dismiss') => {
     void fetch(`/api/leaks/${id}`, {
       method: 'PATCH',
@@ -1014,6 +1039,7 @@ export function EditorApp() {
       onBrandChange={brandEnabled ? handleBrandChange : undefined}
       leakAlerts={leakAlerts}
       onLeakAction={handleLeakAction}
+      onDmcaAction={handleDmcaAction}
     />
   )
 }

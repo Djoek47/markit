@@ -122,6 +122,8 @@ export type MarkitEditorV2Props = {
   /** Leak alerts from Creatix. Provided only when MARKIT_FEATURE_LEAK_MONITOR=1. */
   leakAlerts?: LeakAlertView[]
   onLeakAction?: (id: string, action: 'view' | 'dismiss') => void
+  /** DMCA forwarder actions. Provided only when MARKIT_FEATURE_DMCA_FORWARDER=1. */
+  onDmcaAction?: (leakViewId: string, action: 'generate' | 'send') => void
 }
 
 function fmt(sec: number) {
@@ -233,9 +235,11 @@ const SEVERITY_COLOR: Record<string, string> = {
 function LeaksPanel({
   alerts,
   onAction,
+  onDmcaAction,
 }: {
   alerts: LeakAlertView[]
   onAction?: (id: string, action: 'view' | 'dismiss') => void
+  onDmcaAction?: (leakViewId: string, action: 'generate' | 'send') => void
 }) {
   const active = alerts.filter((a) => !a.dismissedAt)
   const dismissed = alerts.filter((a) => a.dismissedAt)
@@ -314,7 +318,7 @@ function LeaksPanel({
               {new Date(alert.detectedAt).toLocaleDateString()} · {alert.source} · DMCA: {alert.dmcaState}
             </p>
 
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {!alert.viewedAt && onAction ? (
                 <button
                   type="button"
@@ -333,6 +337,26 @@ function LeaksPanel({
                   onClick={() => onAction(alert.id, 'dismiss')}
                 >
                   Dismiss
+                </button>
+              ) : null}
+              {alert.dmcaState === 'none' && onDmcaAction ? (
+                <button
+                  type="button"
+                  className="mk-btn mk-btn-ghost"
+                  style={{ fontSize: 10, color: 'var(--accent)' }}
+                  onClick={() => onDmcaAction(alert.id, 'generate')}
+                >
+                  Draft DMCA
+                </button>
+              ) : null}
+              {alert.dmcaState === 'drafted' && onDmcaAction ? (
+                <button
+                  type="button"
+                  className="mk-btn mk-btn-primary"
+                  style={{ fontSize: 10 }}
+                  onClick={() => onDmcaAction(alert.id, 'send')}
+                >
+                  Send DMCA
                 </button>
               ) : null}
             </div>
@@ -518,6 +542,7 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
     onBrandChange,
     leakAlerts,
     onLeakAction,
+    onDmcaAction,
   } = props
 
   // ── Divine pending queue ──────────────────────────────────────────────────
@@ -839,6 +864,7 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
                       segments: timelineSegments,
                       setSegments: onTimelineSegmentsChange,
                       setCropRect: onCropRectChange,
+                      onDmcaAction,
                     }),
                   )
                 }
@@ -1304,7 +1330,7 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
               ) : null}
 
               {tab === 'leaks' && leakAlerts ? (
-                <LeaksPanel alerts={leakAlerts} onAction={onLeakAction} />
+                <LeaksPanel alerts={leakAlerts} onAction={onLeakAction} onDmcaAction={onDmcaAction} />
               ) : null}
             </div>
           </aside>
