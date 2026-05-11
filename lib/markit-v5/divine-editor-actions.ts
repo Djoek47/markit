@@ -80,6 +80,141 @@ export type DivineSetSegmentFade = {
   fadeOutMs?: number
 }
 
+// ─── v8 AI editing actions (queued for confirmation) ─────────────────────────
+
+/**
+ * Automatically trim silence / low-energy sections from a segment.
+ * Requires an intensity scan for the segment's source media.
+ */
+export type DivineAutoTrimSilence = {
+  type: 'auto_trim_silence'
+  segmentId: string
+}
+
+/**
+ * Crop a segment to a specific aspect ratio.
+ * Platform-aware variants: 9:16-of (OnlyFans), 9:16-fansly (Fansly) match their
+ * safe-zone guidelines; they resolve to the same rect but carry platform metadata.
+ */
+export type DivineCropToAspect = {
+  type: 'crop_to_aspect'
+  segmentId: string
+  aspect: '9:16-of' | '9:16-fansly' | '9:16' | '1:1' | '4:5' | '16:9' | 'original'
+}
+
+/** Blur faces in a segment — auto-detect or manual regions. */
+export type DivineBlurFaces = {
+  type: 'blur_faces'
+  segmentId: string
+  mode: 'auto' | 'manual'
+  regions?: Array<{ x: number; y: number; width: number; height: number }>
+}
+
+/** Set playback speed using the v8 clip identifier (alias for set_segment_speed with different field name for backward compat). */
+export type DivineSetClipSpeed = {
+  type: 'set_clip_speed'
+  segmentId: string
+  speedPct: number // 25..400
+}
+
+/**
+ * Create a short teaser clip from the highest-intensity window.
+ * Requires intensity scan. `targetSec` is the desired teaser duration.
+ */
+export type DivineCreateTeaser = {
+  type: 'create_teaser'
+  segmentId: string
+  targetSec: number
+  mode: 'single' | 'multi-shot'
+  shotCount?: number
+}
+
+/**
+ * Trim the segment to end on its highest-intensity climax peak.
+ * Requires intensity scan. `tailSec` is optional padding after the climax.
+ */
+export type DivineEndOnClimax = {
+  type: 'end_on_climax'
+  segmentId: string
+  tailSec?: number
+}
+
+// ─── v8 brand + trace + export actions (queued for confirmation) ──────────────
+
+/** Set the recipient label (and optional platform) for the next Ariadne trace export. */
+export type DivineSetRecipient = {
+  type: 'set_recipient'
+  recipientLabel: string
+  platform?: 'onlyfans' | 'fansly' | 'manyvids' | 'custom'
+  platformId?: string
+}
+
+/** Toggle brand watermark overlay on/off for the export. */
+export type DivineSetBrandApply = {
+  type: 'set_brand_apply'
+  applyBrand: boolean
+}
+
+/** Configure which Ariadne trace layers to use on this export. */
+export type DivineSetTraceLayers = {
+  type: 'set_trace_layers'
+  spatialGrid: boolean
+  temporalRedundancy: boolean
+  metadataAppend: boolean
+}
+
+/** Confirm and start the render + export pipeline. */
+export type DivineStartExport = {
+  type: 'start_export'
+  confirm: boolean
+}
+
+// ─── v8 library / vault navigation actions (applied immediately) ──────────────
+
+/** Search the media library. */
+export type DivineLibrarySearch = {
+  type: 'library_search'
+  query: string
+}
+
+/** Select a media item in the library (optionally adding to multi-selection). */
+export type DivineLibrarySelectMedia = {
+  type: 'library_select_media'
+  mediaId: string
+  multi?: boolean
+}
+
+/** Trigger "Create with AI" for a set of selected media IDs. */
+export type DivineLibraryCreateWithAi = {
+  type: 'library_create_with_ai'
+  mediaIds: string[]
+}
+
+/** Open / focus a specific Ariadne marker in the vault panel. */
+export type DivineVaultOpenMarker = {
+  type: 'vault_open_marker'
+  markerId: string
+}
+
+/** Dismiss a leak alert view in the vault. */
+export type DivineVaultDismissLeak = {
+  type: 'vault_dismiss_leak'
+  leakViewId: string
+}
+
+/** Trigger DMCA draft generation for a leak. */
+export type DivineVaultGenerateDmca = {
+  type: 'vault_generate_dmca'
+  leakViewId: string
+}
+
+/** Send a DMCA takedown notice for a leak. */
+export type DivineVaultSendDmca = {
+  type: 'vault_send_dmca'
+  leakViewId: string
+  hostDestination?: string
+}
+
 // ─── Union ────────────────────────────────────────────────────────────────────
 
 export type EditorDivineUiAction =
@@ -97,6 +232,40 @@ export type EditorDivineUiAction =
   | DivineSetCropProfile
   | DivineSetSegmentSpeed
   | DivineSetSegmentFade
+  // v8 AI editing (6 — queued for confirmation, some need intensity scan)
+  | DivineAutoTrimSilence
+  | DivineCropToAspect
+  | DivineBlurFaces
+  | DivineSetClipSpeed
+  | DivineCreateTeaser
+  | DivineEndOnClimax
+  // v8 brand + trace + export (4 — queued for confirmation)
+  | DivineSetRecipient
+  | DivineSetBrandApply
+  | DivineSetTraceLayers
+  | DivineStartExport
+  // v8 library / vault navigation (7 — applied immediately)
+  | DivineLibrarySearch
+  | DivineLibrarySelectMedia
+  | DivineLibraryCreateWithAi
+  | DivineVaultOpenMarker
+  | DivineVaultDismissLeak
+  | DivineVaultGenerateDmca
+  | DivineVaultSendDmca
+
+/**
+ * Actions that require an intensity scan result before they can be applied.
+ * The applier returns PRECONDITION_MISSING when the scan is absent.
+ */
+export function isIntensityScanRequired(
+  action: EditorDivineUiAction,
+): action is DivineAutoTrimSilence | DivineCreateTeaser | DivineEndOnClimax {
+  return (
+    action.type === 'auto_trim_silence' ||
+    action.type === 'create_teaser' ||
+    action.type === 'end_on_climax'
+  )
+}
 
 /** True for actions that mutate the timeline and must be confirmed before applying. */
 export function isTimelineEditAction(
@@ -108,7 +277,17 @@ export function isTimelineEditAction(
   | DivineReorderSegment
   | DivineSetCropProfile
   | DivineSetSegmentSpeed
-  | DivineSetSegmentFade {
+  | DivineSetSegmentFade
+  | DivineAutoTrimSilence
+  | DivineCropToAspect
+  | DivineBlurFaces
+  | DivineSetClipSpeed
+  | DivineCreateTeaser
+  | DivineEndOnClimax
+  | DivineSetRecipient
+  | DivineSetBrandApply
+  | DivineSetTraceLayers
+  | DivineStartExport {
   return (
     action.type === 'split_segment' ||
     action.type === 'trim_segment' ||
@@ -116,7 +295,17 @@ export function isTimelineEditAction(
     action.type === 'reorder_segment' ||
     action.type === 'set_crop_profile' ||
     action.type === 'set_segment_speed' ||
-    action.type === 'set_segment_fade'
+    action.type === 'set_segment_fade' ||
+    action.type === 'auto_trim_silence' ||
+    action.type === 'crop_to_aspect' ||
+    action.type === 'blur_faces' ||
+    action.type === 'set_clip_speed' ||
+    action.type === 'create_teaser' ||
+    action.type === 'end_on_climax' ||
+    action.type === 'set_recipient' ||
+    action.type === 'set_brand_apply' ||
+    action.type === 'set_trace_layers' ||
+    action.type === 'start_export'
   )
 }
 
@@ -186,6 +375,110 @@ export function parseEditorDivineUiAction(raw: unknown): EditorDivineUiAction | 
     if (typeof o.fadeInMs === 'number' && Number.isFinite(o.fadeInMs)) action.fadeInMs = Math.max(0, Math.min(5000, o.fadeInMs))
     if (typeof o.fadeOutMs === 'number' && Number.isFinite(o.fadeOutMs)) action.fadeOutMs = Math.max(0, Math.min(5000, o.fadeOutMs))
     if (action.fadeInMs === undefined && action.fadeOutMs === undefined) return null
+    return action
+  }
+
+  // ── v8 AI editing ──────────────────────────────────────────────────────────
+  if (t === 'auto_trim_silence' && typeof o.segmentId === 'string') {
+    return { type: 'auto_trim_silence', segmentId: o.segmentId }
+  }
+  if (t === 'crop_to_aspect' && typeof o.segmentId === 'string') {
+    const a = o.aspect
+    const validAspects = ['9:16-of', '9:16-fansly', '9:16', '1:1', '4:5', '16:9', 'original'] as const
+    if (!validAspects.includes(a as (typeof validAspects)[number])) return null
+    return { type: 'crop_to_aspect', segmentId: o.segmentId, aspect: a as DivineCropToAspect['aspect'] }
+  }
+  if (t === 'blur_faces' && typeof o.segmentId === 'string') {
+    const mode = o.mode
+    if (mode !== 'auto' && mode !== 'manual') return null
+    const action: DivineBlurFaces = { type: 'blur_faces', segmentId: o.segmentId, mode }
+    if (Array.isArray(o.regions)) {
+      const regions = (o.regions as unknown[]).filter(
+        (r): r is { x: number; y: number; width: number; height: number } =>
+          typeof r === 'object' && r !== null &&
+          typeof (r as Record<string, unknown>).x === 'number' &&
+          typeof (r as Record<string, unknown>).y === 'number' &&
+          typeof (r as Record<string, unknown>).width === 'number' &&
+          typeof (r as Record<string, unknown>).height === 'number',
+      )
+      action.regions = regions
+    }
+    return action
+  }
+  if (t === 'set_clip_speed' && typeof o.segmentId === 'string' && typeof o.speedPct === 'number') {
+    return { type: 'set_clip_speed', segmentId: o.segmentId, speedPct: Math.max(25, Math.min(400, o.speedPct)) }
+  }
+  if (t === 'create_teaser' && typeof o.segmentId === 'string' && typeof o.targetSec === 'number' && Number.isFinite(o.targetSec)) {
+    const mode = o.mode
+    if (mode !== 'single' && mode !== 'multi-shot') return null
+    const action: DivineCreateTeaser = { type: 'create_teaser', segmentId: o.segmentId, targetSec: Math.max(0, o.targetSec), mode }
+    if (typeof o.shotCount === 'number' && Number.isFinite(o.shotCount)) action.shotCount = Math.max(1, Math.floor(o.shotCount))
+    return action
+  }
+  if (t === 'end_on_climax' && typeof o.segmentId === 'string') {
+    const action: DivineEndOnClimax = { type: 'end_on_climax', segmentId: o.segmentId }
+    if (typeof o.tailSec === 'number' && Number.isFinite(o.tailSec)) action.tailSec = Math.max(0, o.tailSec)
+    return action
+  }
+
+  // ── v8 brand + trace + export ──────────────────────────────────────────────
+  if (t === 'set_recipient' && typeof o.recipientLabel === 'string' && o.recipientLabel.trim() !== '') {
+    const action: DivineSetRecipient = { type: 'set_recipient', recipientLabel: o.recipientLabel.trim() }
+    const validPlatforms = ['onlyfans', 'fansly', 'manyvids', 'custom'] as const
+    if (validPlatforms.includes(o.platform as (typeof validPlatforms)[number])) {
+      action.platform = o.platform as DivineSetRecipient['platform']
+    }
+    if (typeof o.platformId === 'string') action.platformId = o.platformId
+    return action
+  }
+  if (t === 'set_brand_apply' && typeof o.applyBrand === 'boolean') {
+    return { type: 'set_brand_apply', applyBrand: o.applyBrand }
+  }
+  if (
+    t === 'set_trace_layers' &&
+    typeof o.spatialGrid === 'boolean' &&
+    typeof o.temporalRedundancy === 'boolean' &&
+    typeof o.metadataAppend === 'boolean'
+  ) {
+    return {
+      type: 'set_trace_layers',
+      spatialGrid: o.spatialGrid,
+      temporalRedundancy: o.temporalRedundancy,
+      metadataAppend: o.metadataAppend,
+    }
+  }
+  if (t === 'start_export' && typeof o.confirm === 'boolean') {
+    return { type: 'start_export', confirm: o.confirm }
+  }
+
+  // ── v8 library / vault navigation ──────────────────────────────────────────
+  if (t === 'library_search' && typeof o.query === 'string') {
+    return { type: 'library_search', query: o.query }
+  }
+  if (t === 'library_select_media' && typeof o.mediaId === 'string') {
+    return {
+      type: 'library_select_media',
+      mediaId: o.mediaId,
+      multi: o.multi === true ? true : undefined,
+    }
+  }
+  if (t === 'library_create_with_ai' && Array.isArray(o.mediaIds)) {
+    const mediaIds = (o.mediaIds as unknown[]).filter((id): id is string => typeof id === 'string')
+    if (mediaIds.length === 0) return null
+    return { type: 'library_create_with_ai', mediaIds }
+  }
+  if (t === 'vault_open_marker' && typeof o.markerId === 'string') {
+    return { type: 'vault_open_marker', markerId: o.markerId }
+  }
+  if (t === 'vault_dismiss_leak' && typeof o.leakViewId === 'string') {
+    return { type: 'vault_dismiss_leak', leakViewId: o.leakViewId }
+  }
+  if (t === 'vault_generate_dmca' && typeof o.leakViewId === 'string') {
+    return { type: 'vault_generate_dmca', leakViewId: o.leakViewId }
+  }
+  if (t === 'vault_send_dmca' && typeof o.leakViewId === 'string') {
+    const action: DivineVaultSendDmca = { type: 'vault_send_dmca', leakViewId: o.leakViewId }
+    if (typeof o.hostDestination === 'string') action.hostDestination = o.hostDestination
     return action
   }
 
