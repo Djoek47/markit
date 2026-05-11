@@ -8,6 +8,7 @@ import { DivineOrb } from '@/components/markit-v5/divine-orb'
 import type { MarkitEditPlanV1 } from '@/lib/markit-edit-plan'
 import { MARKIT_OUTPUT_FORMATS, planNeedsSecondarySource } from '@/lib/markit-edit-plan'
 import { applyEditorDivineAction, makeDivineApplierContext } from '@/lib/markit-v5/divine-action-applier'
+import { useDivineQueueStore } from '@/lib/stores/divine-queue-store'
 import { useEditorShellStore } from '@/lib/stores/editor-shell-store'
 import type { TimelineSegment } from '@/lib/timeline-project'
 import { resizeSegmentEdge, splitSegmentAtSec, rectForAspect, patchSegment } from '@/lib/timeline-project'
@@ -103,9 +104,6 @@ export type MarkitEditorV2Props = {
   }
   /** When true with Premium, allow legacy keyword `/api/divine/voice-edit` path (incidents). */
   keywordVoiceIncident: boolean
-  /** Optional Divine suggestion awaiting user approval (ghost navigation). */
-  pendingDivineAction: import('@/lib/markit-v5/divine-editor-actions').EditorDivineUiAction | null
-  onDivineResolved: () => void
   timelineManifest: { revision: number; segmentChecksum: string }
   cropRect: { x: number; y: number; width: number; height: number }
   onCropRectChange: (next: { x: number; y: number; width: number; height: number }) => void
@@ -249,8 +247,6 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
     divineVoicePremium,
     markitVoice,
     keywordVoiceIncident,
-    pendingDivineAction,
-    onDivineResolved,
     timelineManifest,
     cropRect,
     onCropRectChange,
@@ -258,6 +254,13 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
     previewUrl,
     onClearPreview,
   } = props
+
+  // ── Divine pending queue ──────────────────────────────────────────────────
+  const divineQueue = useDivineQueueStore((s) => s.queue)
+  const divineConfirm = useDivineQueueStore((s) => s.confirm)
+  const divineDismiss = useDivineQueueStore((s) => s.dismiss)
+  const topDivineItem = divineQueue[0] ?? null
+  const extraDivineCount = Math.max(0, divineQueue.length - 1)
 
   const density = useEditorShellStore((s) => s.density)
   const setDensity = useEditorShellStore((s) => s.setDensity)
@@ -474,7 +477,7 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
     <div
       className="markit-shell grid h-dvh overflow-hidden bg-[var(--background)] text-[var(--foreground)]"
       style={{
-        gridTemplateRows: pendingDivineAction
+        gridTemplateRows: topDivineItem
           ? '52px minmax(0, auto) 1fr 28px'
           : '52px 1fr 28px',
       }}
@@ -533,33 +536,48 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
         </div>
       </header>
 
-      {pendingDivineAction ? (
+      {topDivineItem ? (
         <div
           className="flex min-h-0 items-center justify-between gap-2 border-b px-3 py-2"
           style={{ borderColor: 'var(--border)', background: 'var(--card)' }}
         >
-          <span className="flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
+          <span className="flex min-w-0 items-center gap-2 text-xs text-[var(--muted-foreground)]">
             <DivineOrb size="sm" />
-            Divine suggestion: <span className="font-mono-ui text-[var(--foreground)]">{pendingDivineAction.type}</span>
+            <span className="min-w-0 truncate">
+              <span className="text-[var(--foreground)]">{topDivineItem.description}</span>
+              {extraDivineCount > 0 ? (
+                <span className="ml-2 rounded-full bg-[var(--border)] px-1.5 py-0.5 text-[10px] text-[var(--muted-foreground)]">
+                  +{extraDivineCount} more
+                </span>
+              ) : null}
+            </span>
           </span>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex shrink-0 flex-wrap gap-2">
             <button
               type="button"
               className="mk-btn mk-btn-primary"
               onClick={() => {
-                if (pendingDivineAction) {
+                const item = divineConfirm(topDivineItem.id)
+                if (item) {
                   applyEditorDivineAction(
                     null,
-                    pendingDivineAction,
-                    makeDivineApplierContext((t) => setTab(t)),
+                    item.action,
+                    makeDivineApplierContext((t) => setTab(t), {
+                      segments: timelineSegments,
+                      setSegments: onTimelineSegmentsChange,
+                      setCropRect: onCropRectChange,
+                    }),
                   )
                 }
-                onDivineResolved()
               }}
             >
               Apply
             </button>
-            <button type="button" className="mk-btn" onClick={onDivineResolved}>
+            <button
+              type="button"
+              className="mk-btn"
+              onClick={() => divineDismiss(topDivineItem.id)}
+            >
               Dismiss
             </button>
           </div>

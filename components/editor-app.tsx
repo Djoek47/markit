@@ -9,11 +9,11 @@ import { isMarkitEditorEntitled } from '@/lib/billing'
 import { hasDivineVoicePremium } from '@/lib/premium-divine'
 import { useDivineActionStream } from '@/hooks/use-divine-action-stream'
 import { useMarkitDivineVoice } from '@/hooks/use-markit-divine-voice'
+import { useDivineQueueStore } from '@/lib/stores/divine-queue-store'
 import { parseVaultContentIdFromExportUrl } from '@/lib/content-id'
 import presetsData from '@/lib/data/frame-edit-presets.json'
 import { VideoTrimSection } from '@/components/video-trim-section'
 import { MarkitEditorV2 } from '@/components/studio/markit-editor-v2'
-import type { EditorDivineUiAction } from '@/lib/markit-v5/divine-editor-actions'
 import type { MarkitEditPlanV1 } from '@/lib/markit-edit-plan'
 import { useEditorShellStore } from '@/lib/stores/editor-shell-store'
 import { findLatestEditPlan, planNeedsSecondarySource } from '@/lib/markit-edit-plan'
@@ -483,7 +483,7 @@ export function EditorApp() {
     }
   }, [runLocalPreview, videoDuration, voiceTranscript])
 
-  const [pendingDivine, setPendingDivine] = useState<EditorDivineUiAction | null>(null)
+  const divineEnqueue = useDivineQueueStore((s) => s.enqueue)
 
   const [recipientKey, setRecipientKey] = useState('')
   const [ariadneBusy, setAriadneBusy] = useState(false)
@@ -605,18 +605,35 @@ export function EditorApp() {
       ).slice(0, 4000),
     [timelineSegments],
   )
+  const voiceIntentContext = useMemo(
+    () => ({
+      durationSec: videoDuration > 0 ? videoDuration : undefined,
+      playheadSec: useEditorShellStore.getState().playheadSec,
+      segmentCount: timelineSegments.length,
+      segments: timelineSegments.slice(0, 12).map((s) => ({
+        id: s.id,
+        startSec: s.startSec,
+        endSec: s.endSec,
+        label: s.label,
+      })),
+    }),
+    [videoDuration, timelineSegments],
+  )
+
   const markitVoice = useMarkitDivineVoice({
     enabled: divineVoicePremium === true,
     getAccessToken,
     importUrl: importUrl || 'none',
     timelineSummary,
+    voiceIntentContext,
   })
 
   useDivineActionStream({
     enabled: Boolean(sessionUserId),
     onAction: (action) => {
       if (action.type === 'noop') return
-      setPendingDivine(action)
+      // Enqueue into divine queue — banner in MarkitEditorV2 handles confirm/dismiss
+      divineEnqueue(action, describeStreamAction(action))
     },
   })
 
@@ -874,8 +891,6 @@ export function EditorApp() {
         closingPending: markitVoice.closingPending,
       }}
       keywordVoiceIncident={keywordVoiceIncident}
-      pendingDivineAction={pendingDivine}
-      onDivineResolved={() => setPendingDivine(null)}
       cropRect={cropRect}
       onCropRectChange={(next) => {
         const maxX = Math.max(0, 1 - next.width)
@@ -906,4 +921,44 @@ export function EditorApp() {
       })}
     />
   )
+}
+
+// ─── Helper ───────────────────────────────────────────────────────────────────
+
+/** Short human-readable label for SSE-sourced divine actions (shown in banner). */
+function describeStreamAction(action: { type: string; [k: string]: unknown }): string {
+  switch (action.type) {
+    case 'seek_playhead':
+      return `Seek to ${typeof action.sec === 'number' ? action.sec.toFixed(1) + 's' : '?'}`
+    case 'set_density':
+      return `Switch to ${action.density} mode`
+    case 'set_media_context':
+      return `Switch to ${action.context} context`
+    case 'focus_inspector':
+      return `Open ${action.tab} panel`
+    case 'split_segment':
+      return `Split clip at ${typeof action.splitAtSec === 'number' ? action.splitAtSec.toFixed(1) + 's' : '?'}`
+    case 'trim_segment': {
+      const parts: string[] = []
+      if (typeof action.startSec === 'number') parts.push(`in → ${(action.startSec as number).toFixed(1)}s`)
+      if (typeof action.endSec === 'number') parts.push(`out → ${(action.endSec as number).toFixed(1)}s`)
+      return `Trim clip (${parts.join(', ')})`
+    }
+    case 'remove_segment':
+      return 'Remove clip'
+    case 'reorder_segment':
+      return `Move clip to position ${typeof action.toIndex === 'number' ? (action.toIndex as number) + 1 : '?'}`
+    case 'set_crop_profile':
+      return `Crop: ${action.profile}`
+    case 'set_segment_speed':
+      return `Speed: ${action.speedPct}%`
+    case 'set_segment_fade': {
+      const parts: string[] = []
+      if (typeof action.fadeInMs === 'number') parts.push(`fade in ${action.fadeInMs}ms`)
+      if (typeof action.fadeOutMs === 'number') parts.push(`fade out ${action.fadeOutMs}ms`)
+      return `Set ${parts.join(', ')}`
+    }
+    default:
+      return action.type as string
+  }
 }
