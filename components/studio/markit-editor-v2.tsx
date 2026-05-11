@@ -964,10 +964,18 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
               <button type="button" className="mk-btn mk-btn-primary" onClick={onExportTimeline} disabled={exportDisabled}>
                 Export
               </button>
-              <button type="button" className="pro-only mk-btn">
-                Snap
-              </button>
-              <button type="button" className="pro-only mk-btn">
+              <button
+                type="button"
+                className="pro-only mk-btn"
+                disabled={!videoSrc || timelineSegments.length === 0}
+                onClick={() => {
+                  const seg = timelineSegments.find(
+                    (s) => currentTime >= s.startSec && currentTime < s.endSec,
+                  )
+                  if (!seg) return
+                  onTimelineSegmentsChange(splitSegmentAtSec(timelineSegments, seg.id, currentTime))
+                }}
+              >
                 Split
               </button>
               <span className="mk-spacer" />
