@@ -1,17 +1,25 @@
 {
-  "name": "markit",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev --webpack -p 3020",
-    "build": "next build --webpack",
-    "start": "next start -p 3020",
-    "lint": "eslint",
-    "test": "vitest run",
-    "openreel:sync": "tsx scripts/sync-openreel.ts",
-    "test:forensics-benchmark": "tsx scripts/forensics-benchmark.ts"
+  "upstreamUrl": "https://github.com/Augani/openreel-video.git",
+  "upstreamRef": "main",
+  "upstreamBranch": "main",
+  "upstreamCommit": "c11f30d323737e7632f51186ac9e9b3a6624d61c",
+  "syncedAt": "2026-05-11T00:50:42.972Z",
+  "vendorPath": "vendor/openreel",
+  "sourceMap": {
+    "apps/web/src": "vendor/openreel/web",
+    "packages/core/src": "vendor/openreel/core",
+    "packages/ui/src": "vendor/openreel/ui",
+    "packages/image-core/src": "vendor/openreel/image-core"
   },
-  "dependencies": {
+  "markitPatchPolicy": [
+    "Next 16 webpack aliases and browser-only editor entry live outside vendor/openreel.",
+    "Vite env references are converted to process.env.",
+    "Remote worker imports are converted to package imports.",
+    "React 19 ref compatibility is patched for timeline components.",
+    "Visible editor branding and project-name generation are patched to Markit.",
+    "Premium Markit/Circe styling lives in app/globals.css and should not be overwritten by sync."
+  ],
+  "packageDependencies": {
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "@gsap/react": "^2.1.2",
@@ -55,7 +63,7 @@
     "zod": "^4.3.6",
     "zustand": "^5.0.12"
   },
-  "devDependencies": {
+  "packageDevDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -69,5 +77,9 @@
     "tsx": "^4.20.6",
     "typescript": "^5",
     "vitest": "^4.1.5"
+  },
+  "vendorStats": {
+    "files": 428,
+    "bytes": 4613729
   }
 }
