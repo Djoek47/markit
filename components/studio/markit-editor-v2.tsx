@@ -15,7 +15,7 @@ import { resizeSegmentEdge, splitSegmentAtSec, rectForAspect, patchSegment } fro
 
 export type InspectorTab = 'clip' | 'crop' | 'trim' | 'export' | 'trace'
 
-type LibraryItem = {
+export type LibraryItem = {
   id: string
   name: string
   kind: 'video' | 'audio' | 'image'
@@ -110,6 +110,8 @@ export type MarkitEditorV2Props = {
   ariadneBlock: ReactNode
   previewUrl: string | null
   onClearPreview: () => void
+  /** Media items pre-selected from the library page (?from=library&ids=...). Merged into the library sidebar on mount. */
+  initialLibraryItems?: LibraryItem[]
 }
 
 function fmt(sec: number) {
@@ -253,6 +255,7 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
     ariadneBlock,
     previewUrl,
     onClearPreview,
+    initialLibraryItems,
   } = props
 
   // ── Divine pending queue ──────────────────────────────────────────────────
@@ -277,6 +280,11 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
   const [libraryQuery, setLibraryQuery] = useState('')
   const [libraryKind, setLibraryKind] = useState<'all' | 'video' | 'audio' | 'image'>('all')
   const [libraryImports, setLibraryImports] = useState<LibraryItem[]>([])
+  const initialLibraryRef = useRef(initialLibraryItems)
+  useEffect(() => {
+    if (initialLibraryRef.current?.length) setLibraryImports(initialLibraryRef.current)
+  }, [])
+
   const [auxClips, setAuxClips] = useState<TimelineClip[]>([])
   const [divineOpen, setDivineOpen] = useState(false)
   const [micHolding, setMicHolding] = useState(false)

@@ -14,6 +14,8 @@ import { parseVaultContentIdFromExportUrl } from '@/lib/content-id'
 import presetsData from '@/lib/data/frame-edit-presets.json'
 import { VideoTrimSection } from '@/components/video-trim-section'
 import { MarkitEditorV2 } from '@/components/studio/markit-editor-v2'
+import type { LibraryItem } from '@/components/studio/markit-editor-v2'
+import type { BatchMediaItem } from '@/app/api/media/batch/route'
 import type { MarkitEditPlanV1 } from '@/lib/markit-edit-plan'
 import { useEditorShellStore } from '@/lib/stores/editor-shell-store'
 import { findLatestEditPlan, planNeedsSecondarySource } from '@/lib/markit-edit-plan'
@@ -57,6 +59,32 @@ export function EditorApp() {
   const hasVaultBridge = Boolean(importUrl && exportUrl && exportToken)
   const hasSecondaryImport = Boolean(importUrl2)
   const contentId = useMemo(() => (exportUrl ? parseVaultContentIdFromExportUrl(exportUrl) : null), [exportUrl])
+
+  // Library bootstrap: when arriving from /library?from=library&ids=..., pre-populate the editor library sidebar.
+  const fromLibrary = sp.get('from') === 'library'
+  const libraryIds = sp.get('ids') ?? ''
+  const [initialLibraryItems, setInitialLibraryItems] = useState<LibraryItem[] | undefined>(undefined)
+
+  useEffect(() => {
+    if (!fromLibrary || !libraryIds) return
+    void fetch(`/api/media/batch?ids=${encodeURIComponent(libraryIds)}`)
+      .then((r) => r.json())
+      .then((body: { items?: BatchMediaItem[] }) => {
+        if (!body.items?.length) return
+        setInitialLibraryItems(
+          body.items.map((item) => ({
+            id: item.id,
+            name: item.name,
+            kind: item.kind,
+            src: item.signedUrl,
+            importedAt: item.imported_at,
+          })),
+        )
+      })
+      .catch(() => {})
+  // Run only on mount — ids are stable from the URL
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const [sessionUserId, setSessionUserId] = useState<string | null>(null)
   const [paid, setPaid] = useState<boolean | null>(null)
@@ -919,6 +947,7 @@ export function EditorApp() {
           },
         ],
       })}
+      initialLibraryItems={initialLibraryItems}
     />
   )
 }
