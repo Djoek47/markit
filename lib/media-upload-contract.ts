@@ -33,8 +33,8 @@ export type SignUploadResponse = SignUploadSuccess | SignUploadError
 
 export type FinalizeMediaRequest = {
   mediaId: string
-  /** SHA-256 hex of the uploaded file (verifier uses this). */
-  sha256: string
+  /** SHA-256 hex of the uploaded file. Optional — column is nullable; large files skip client-side hashing. */
+  sha256?: string
   width?: number
   height?: number
   durationSec?: number
@@ -113,8 +113,8 @@ export function validateFinalizeMediaRequest(value: unknown): FinalizeMediaReque
     issues.push('mediaId must be a non-empty string')
   }
 
-  if (typeof o.sha256 !== 'string' || !/^[0-9a-f]{64}$/i.test(o.sha256)) {
-    issues.push('sha256 must be a 64-char hex string')
+  if (o.sha256 !== undefined && (typeof o.sha256 !== 'string' || !/^[0-9a-f]{64}$/i.test(o.sha256))) {
+    issues.push('sha256 must be a 64-char hex string when present')
   }
 
   const optNumbers: (keyof FinalizeMediaRequest)[] = ['width', 'height', 'durationSec']
@@ -134,7 +134,7 @@ export function validateFinalizeMediaRequest(value: unknown): FinalizeMediaReque
     ok: true,
     request: {
       mediaId: o.mediaId as string,
-      sha256: o.sha256 as string,
+      ...(typeof o.sha256 === 'string' ? { sha256: o.sha256 } : {}),
       ...(typeof o.width === 'number' ? { width: o.width } : {}),
       ...(typeof o.height === 'number' ? { height: o.height } : {}),
       ...(typeof o.durationSec === 'number' ? { durationSec: o.durationSec } : {}),

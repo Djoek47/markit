@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
 
   // Patch the media row with verified metadata
   const patch: Record<string, unknown> = {}
-  if (sha256) patch.output_sha256 = sha256
+  if (typeof sha256 === 'string' && sha256) patch.output_sha256 = sha256
   if (width !== undefined) patch.width = width
   if (height !== undefined) patch.height = height
   if (durationSec !== undefined) patch.duration_sec = durationSec
