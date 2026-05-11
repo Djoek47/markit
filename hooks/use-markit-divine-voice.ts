@@ -463,8 +463,6 @@ export function useMarkitDivineVoice(opts: {
     }
   }, [endVoiceCall, opts.enabled, opts.importUrl, opts.timelineSummary, runEditTimelineLocally])
 
-  scheduleIdleDisconnectRef.current = () => {}
-
   return {
     status,
     error,

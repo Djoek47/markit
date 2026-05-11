@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { buildAriadneM2MRequestHeaders } from '@/lib/ariadne/creatix-ariadne-client'
+import { checkRateLimit, rateLimitKeyFromRequest } from '@/lib/rate-limit'
 
 const DETECT_MAX_BYTES = 120 * 1024 * 1024 // 120 MB, matches Creatix
+const DETECT_LIMIT = 60
+const DETECT_WINDOW_MS = 60 * 60 * 1000 // 1 hour
 
 /**
  * Multipart proxy: forwards /api/ariadne/detect requests to Creatix.
@@ -13,6 +16,14 @@ const DETECT_MAX_BYTES = 120 * 1024 * 1024 // 120 MB, matches Creatix
  * Size limit: rejects 413 if Content-Length > 120 MB.
  */
 export async function POST(req: NextRequest) {
+  const rl = checkRateLimit(rateLimitKeyFromRequest(req), DETECT_LIMIT, DETECT_WINDOW_MS)
+  if (!rl.ok) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded', retryAfterMs: rl.retryAfterMs },
+      { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.retryAfterMs / 1000)) } },
+    )
+  }
+
   const creatix = (process.env.NEXT_PUBLIC_CREATIX_APP_URL || 'https://www.circeetvenus.com').replace(/\/$/, '')
 
   // Check Content-Length before reading body
@@ -54,7 +65,7 @@ export async function POST(req: NextRequest) {
     Object.assign(headers, m2mHeaders)
   }
 
-  // Forward multipart body directly (re-stream to avoid buffering entire file)
+  // Forward buffered multipart form data to Creatix (body already read via formData() above)
   const res = await fetch(`${creatix}/api/ariadne/detect`, {
     method: 'POST',
     headers,
