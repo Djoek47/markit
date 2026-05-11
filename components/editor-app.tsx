@@ -16,6 +16,8 @@ import { VideoTrimSection } from '@/components/video-trim-section'
 import { MarkitEditorV2 } from '@/components/studio/markit-editor-v2'
 import type { LibraryItem } from '@/components/studio/markit-editor-v2'
 import type { BatchMediaItem } from '@/app/api/media/batch/route'
+import type { BrandSnapshot } from '@/lib/brand-contract'
+import { validateBrandSnapshot, defaultBrandSnapshot } from '@/lib/brand-contract'
 import type { MarkitEditPlanV1 } from '@/lib/markit-edit-plan'
 import { useEditorShellStore } from '@/lib/stores/editor-shell-store'
 import { findLatestEditPlan, planNeedsSecondarySource } from '@/lib/markit-edit-plan'
@@ -84,6 +86,36 @@ export function EditorApp() {
       .catch(() => {})
   // Run only on mount — ids are stable from the URL
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Brand settings — fetched once on mount; auto-saved (debounced) on change.
+  const [brandSnapshot, setBrandSnapshot] = useState<BrandSnapshot>(defaultBrandSnapshot())
+  const [brandEnabled, setBrandEnabled] = useState(false)
+  const brandSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    void fetch('/api/brand')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body: { snapshot?: BrandSnapshot } | null) => {
+        if (body?.snapshot) {
+          setBrandSnapshot(body.snapshot)
+          setBrandEnabled(true)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  const handleBrandChange = useCallback((next: BrandSnapshot) => {
+    setBrandSnapshot(next)
+    if (!validateBrandSnapshot(next).ok) return
+    if (brandSaveTimer.current) clearTimeout(brandSaveTimer.current)
+    brandSaveTimer.current = setTimeout(() => {
+      void fetch('/api/brand', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      }).catch(() => {})
+    }, 600)
   }, [])
 
   const [sessionUserId, setSessionUserId] = useState<string | null>(null)
@@ -948,6 +980,8 @@ export function EditorApp() {
         ],
       })}
       initialLibraryItems={initialLibraryItems}
+      brandSnapshot={brandEnabled ? brandSnapshot : undefined}
+      onBrandChange={brandEnabled ? handleBrandChange : undefined}
     />
   )
 }

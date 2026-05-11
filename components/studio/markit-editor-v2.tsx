@@ -6,6 +6,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BrandSeal } from '@/components/markit-v5/brand-seal'
 import { DivineOrb } from '@/components/markit-v5/divine-orb'
 import type { MarkitEditPlanV1 } from '@/lib/markit-edit-plan'
+import type { BrandSnapshot, BrandPlatform, BrandPosition } from '@/lib/brand-contract'
+import { validateBrandSnapshot, formatBrandHandle } from '@/lib/brand-contract'
 import { MARKIT_OUTPUT_FORMATS, planNeedsSecondarySource } from '@/lib/markit-edit-plan'
 import { applyEditorDivineAction, makeDivineApplierContext } from '@/lib/markit-v5/divine-action-applier'
 import { useDivineQueueStore } from '@/lib/stores/divine-queue-store'
@@ -104,6 +106,9 @@ export type MarkitEditorV2Props = {
   }
   /** When true with Premium, allow legacy keyword `/api/divine/voice-edit` path (incidents). */
   keywordVoiceIncident: boolean
+  /** Brand watermark overlay settings. Provided only when MARKIT_FEATURE_BRAND_PERSISTENCE=1. */
+  brandSnapshot?: BrandSnapshot
+  onBrandChange?: (next: BrandSnapshot) => void
   timelineManifest: { revision: number; segmentChecksum: string }
   cropRect: { x: number; y: number; width: number; height: number }
   onCropRectChange: (next: { x: number; y: number; width: number; height: number }) => void
@@ -212,6 +217,124 @@ function clipToSegment(clip: TimelineClip): TimelineSegment {
   }
 }
 
+// ─── Brand panel ─────────────────────────────────────────────────────────────
+
+const PLATFORMS: BrandPlatform[] = ['onlyfans', 'fansly', 'manyvids', 'custom']
+const POSITIONS: BrandPosition[] = [
+  'top-left',    'top-center',    'top-right',
+  'middle-left', 'middle-center', 'middle-right',
+  'bottom-left', 'bottom-center', 'bottom-right',
+]
+
+function BrandPanel({ snapshot, onChange }: { snapshot: BrandSnapshot; onChange: (next: BrandSnapshot) => void }) {
+  const patch = (partial: Partial<BrandSnapshot>) => onChange({ ...snapshot, ...partial })
+  const isValid = validateBrandSnapshot(snapshot).ok
+
+  return (
+    <div className="mk-section" style={{ borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 4 }}>
+      {/* Header row with toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <h4 style={{ margin: 0 }}>Brand <em>overlay</em></h4>
+        <button
+          type="button"
+          onClick={() => patch({ enabled: !snapshot.enabled })}
+          style={{
+            width: 36, height: 20, borderRadius: 10,
+            background: snapshot.enabled ? 'var(--accent)' : 'var(--border)',
+            border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.15s',
+          }}
+          aria-label={snapshot.enabled ? 'Disable brand overlay' : 'Enable brand overlay'}
+        >
+          <span style={{
+            position: 'absolute', top: 3, left: snapshot.enabled ? 18 : 3,
+            width: 14, height: 14, borderRadius: '50%',
+            background: 'var(--foreground)', transition: 'left 0.15s',
+          }} />
+        </button>
+      </div>
+
+      {/* Platform */}
+      <p className="mk-desc" style={{ marginBottom: 6 }}>Platform</p>
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 12 }}>
+        {PLATFORMS.map((p) => (
+          <button
+            key={p}
+            type="button"
+            className={`rounded-full border px-2.5 py-1 font-mono-ui text-[10px] uppercase tracking-wide ${
+              snapshot.platform === p
+                ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--foreground)]'
+                : 'text-[var(--muted-foreground)]'
+            }`}
+            style={{ borderColor: snapshot.platform === p ? 'var(--accent)' : 'var(--border)' }}
+            onClick={() => patch({ platform: p })}
+          >
+            {p}
+          </button>
+        ))}
+      </div>
+
+      {/* Handle */}
+      <p className="mk-desc" style={{ marginBottom: 6 }}>Handle</p>
+      <input
+        value={snapshot.handle}
+        onChange={(e) => patch({ handle: e.target.value })}
+        placeholder="@yourhandle"
+        style={{
+          width: '100%', padding: '6px 8px', marginBottom: 12,
+          background: 'var(--surface-1)', border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)', fontSize: 11, color: 'var(--foreground)',
+          fontFamily: 'var(--font-jetbrains-mono), monospace',
+          boxSizing: 'border-box',
+        }}
+      />
+
+      {/* Position grid */}
+      <p className="mk-desc" style={{ marginBottom: 6 }}>Position</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginBottom: 12 }}>
+        {POSITIONS.map((pos) => (
+          <button
+            key={pos}
+            type="button"
+            onClick={() => patch({ position: pos })}
+            title={pos}
+            style={{
+              height: 22, borderRadius: 4, border: '1px solid',
+              borderColor: snapshot.position === pos ? 'var(--accent)' : 'var(--border)',
+              background: snapshot.position === pos ? 'var(--accent-soft)' : 'var(--surface-1)',
+              cursor: 'pointer', transition: 'border-color 0.12s, background 0.12s',
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Opacity */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <p className="mk-desc" style={{ margin: 0, minWidth: 50 }}>Opacity</p>
+        <input
+          type="range" min={20} max={100} step={5}
+          value={snapshot.opacityPct}
+          onChange={(e) => patch({ opacityPct: Number(e.target.value) })}
+          style={{ flex: 1 }}
+        />
+        <span style={{ fontFamily: 'var(--font-jetbrains-mono), monospace', fontSize: 9, color: 'var(--muted-foreground)', minWidth: 28, textAlign: 'right' }}>
+          {snapshot.opacityPct}%
+        </span>
+      </div>
+
+      {/* Preview */}
+      {isValid ? (
+        <p style={{ fontFamily: 'var(--font-jetbrains-mono), monospace', fontSize: 9, color: 'var(--accent)', letterSpacing: '0.1em' }}>
+          ✦ {formatBrandHandle(snapshot)} · {snapshot.opacityPct}% · {snapshot.position}
+        </p>
+      ) : (
+        <p style={{ fontFamily: 'var(--font-jetbrains-mono), monospace', fontSize: 9, color: 'var(--muted-foreground)' }}>
+          Enter a handle to save.
+        </p>
+      )}
+    </div>
+  )
+}
+
 export function MarkitEditorV2(props: MarkitEditorV2Props) {
   const {
     creatixUrl,
@@ -256,6 +379,8 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
     previewUrl,
     onClearPreview,
     initialLibraryItems,
+    brandSnapshot,
+    onBrandChange,
   } = props
 
   // ── Divine pending queue ──────────────────────────────────────────────────
@@ -980,33 +1105,39 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
               ) : null}
 
               {tab === 'export' ? (
-                <div className="mk-section">
-                  <h4>
-                    Export <em>format</em>
-                  </h4>
-                  <p className="mk-desc">Maps to EditPlan `output` and encoder lineage (Ariadne embed keeps metadata small).</p>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {MARKIT_OUTPUT_FORMATS.map((fmt) => (
-                      <button
-                        key={fmt}
-                        type="button"
-                        className={`rounded-full border px-2.5 py-1 font-mono-ui text-[10px] uppercase tracking-wide ${
-                          exportFormat === fmt
-                            ? 'border-[var(--primary)] bg-[color-mix(in_oklch,var(--primary)_12%,transparent)] text-[var(--foreground)]'
-                            : 'text-[var(--muted-foreground)]'
-                        }`}
-                        style={{ borderColor: exportFormat === fmt ? 'var(--primary)' : 'var(--border)' }}
-                        onClick={() => setExportFormat(fmt)}
-                      >
-                        {fmt}
-                      </button>
-                    ))}
+                <>
+                  <div className="mk-section">
+                    <h4>
+                      Export <em>format</em>
+                    </h4>
+                    <p className="mk-desc">Maps to EditPlan `output` and encoder lineage (Ariadne embed keeps metadata small).</p>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {MARKIT_OUTPUT_FORMATS.map((fmt) => (
+                        <button
+                          key={fmt}
+                          type="button"
+                          className={`rounded-full border px-2.5 py-1 font-mono-ui text-[10px] uppercase tracking-wide ${
+                            exportFormat === fmt
+                              ? 'border-[var(--primary)] bg-[color-mix(in_oklch,var(--primary)_12%,transparent)] text-[var(--foreground)]'
+                              : 'text-[var(--muted-foreground)]'
+                          }`}
+                          style={{ borderColor: exportFormat === fmt ? 'var(--primary)' : 'var(--border)' }}
+                          onClick={() => setExportFormat(fmt)}
+                        >
+                          {fmt}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-muted-foreground mt-3 text-[10px] leading-relaxed">
+                      Final pixel pipeline may use Markit <code className="font-mono-ui">/api/render</code> when enabled; vault
+                      export remains the primary path for traced files.
+                    </p>
                   </div>
-                  <p className="text-muted-foreground mt-3 text-[10px] leading-relaxed">
-                    Final pixel pipeline may use Markit <code className="font-mono-ui">/api/render</code> when enabled; vault
-                    export remains the primary path for traced files.
-                  </p>
-                </div>
+
+                  {brandSnapshot && onBrandChange ? (
+                    <BrandPanel snapshot={brandSnapshot} onChange={onBrandChange} />
+                  ) : null}
+                </>
               ) : null}
 
               {tab === 'trace' ? (
