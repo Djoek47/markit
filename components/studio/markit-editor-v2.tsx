@@ -8,6 +8,8 @@ import { DivineOrb } from '@/components/markit-v5/divine-orb'
 import type { MarkitEditPlanV1 } from '@/lib/markit-edit-plan'
 import type { BrandSnapshot, BrandPlatform, BrandPosition } from '@/lib/brand-contract'
 import { validateBrandSnapshot, formatBrandHandle } from '@/lib/brand-contract'
+import type { LeakAlertView } from '@/lib/leak-alert-contract'
+import { classifyLeakAlertSeverity, leakAlertNeedsAttention } from '@/lib/leak-alert-contract'
 import { MARKIT_OUTPUT_FORMATS, planNeedsSecondarySource } from '@/lib/markit-edit-plan'
 import { applyEditorDivineAction, makeDivineApplierContext } from '@/lib/markit-v5/divine-action-applier'
 import { useDivineQueueStore } from '@/lib/stores/divine-queue-store'
@@ -15,7 +17,7 @@ import { useEditorShellStore } from '@/lib/stores/editor-shell-store'
 import type { TimelineSegment } from '@/lib/timeline-project'
 import { resizeSegmentEdge, splitSegmentAtSec, rectForAspect, patchSegment } from '@/lib/timeline-project'
 
-export type InspectorTab = 'clip' | 'crop' | 'trim' | 'export' | 'trace'
+export type InspectorTab = 'clip' | 'crop' | 'trim' | 'export' | 'trace' | 'leaks'
 
 export type LibraryItem = {
   id: string
@@ -117,6 +119,9 @@ export type MarkitEditorV2Props = {
   onClearPreview: () => void
   /** Media items pre-selected from the library page (?from=library&ids=...). Merged into the library sidebar on mount. */
   initialLibraryItems?: LibraryItem[]
+  /** Leak alerts from Creatix. Provided only when MARKIT_FEATURE_LEAK_MONITOR=1. */
+  leakAlerts?: LeakAlertView[]
+  onLeakAction?: (id: string, action: 'view' | 'dismiss') => void
 }
 
 function fmt(sec: number) {
@@ -215,6 +220,136 @@ function clipToSegment(clip: TimelineClip): TimelineSegment {
     source: clip.source,
     label: clip.label,
   }
+}
+
+// ─── Leaks panel ─────────────────────────────────────────────────────────────
+
+const SEVERITY_COLOR: Record<string, string> = {
+  high: 'var(--destructive)',
+  medium: 'oklch(0.7 0.18 60)',
+  low: 'var(--muted-foreground)',
+}
+
+function LeaksPanel({
+  alerts,
+  onAction,
+}: {
+  alerts: LeakAlertView[]
+  onAction?: (id: string, action: 'view' | 'dismiss') => void
+}) {
+  const active = alerts.filter((a) => !a.dismissedAt)
+  const dismissed = alerts.filter((a) => a.dismissedAt)
+
+  return (
+    <div className="mk-section">
+      <h4>
+        Leak <em>monitor</em>
+      </h4>
+      <p className="mk-desc">
+        {active.length === 0
+          ? 'No active leak alerts.'
+          : `${active.length} active alert${active.length !== 1 ? 's' : ''} — ${alerts.filter(leakAlertNeedsAttention).length} need attention.`}
+      </p>
+
+      {active.map((alert) => {
+        const severity = classifyLeakAlertSeverity(alert)
+        const needsAttention = leakAlertNeedsAttention(alert)
+        return (
+          <div
+            key={alert.id}
+            style={{
+              marginTop: 10, padding: '10px 12px',
+              background: 'var(--surface-1)', border: '1px solid var(--border)',
+              borderLeft: `3px solid ${SEVERITY_COLOR[severity]}`,
+              borderRadius: 'var(--radius)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <span
+                style={{
+                  fontFamily: 'var(--font-jetbrains-mono), monospace',
+                  fontSize: 8, letterSpacing: '0.2em', textTransform: 'uppercase',
+                  color: SEVERITY_COLOR[severity],
+                }}
+              >
+                {severity}
+              </span>
+              {needsAttention ? (
+                <span style={{
+                  fontFamily: 'var(--font-jetbrains-mono), monospace',
+                  fontSize: 8, letterSpacing: '0.1em', textTransform: 'uppercase',
+                  color: 'var(--destructive)', opacity: 0.8,
+                }}>
+                  · new
+                </span>
+              ) : null}
+            </div>
+
+            <p style={{
+              fontFamily: 'var(--font-jetbrains-mono), monospace',
+              fontSize: 9, color: 'var(--muted-foreground)',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              marginBottom: 4,
+            }}>
+              {alert.url}
+            </p>
+
+            {alert.attributedToRecipientLabel ? (
+              <p style={{
+                fontFamily: 'var(--font-jetbrains-mono), monospace', fontSize: 9,
+                color: 'var(--accent)', marginBottom: 4,
+              }}>
+                ✦ {alert.attributedToRecipientLabel}
+                {alert.attributionConfidence
+                  ? ` · ${Math.round(alert.attributionConfidence * 100)}%`
+                  : ''}
+              </p>
+            ) : null}
+
+            <p style={{
+              fontFamily: 'var(--font-jetbrains-mono), monospace',
+              fontSize: 8, color: 'var(--muted-faint)', marginBottom: 8,
+              letterSpacing: '0.08em',
+            }}>
+              {new Date(alert.detectedAt).toLocaleDateString()} · {alert.source} · DMCA: {alert.dmcaState}
+            </p>
+
+            <div style={{ display: 'flex', gap: 6 }}>
+              {!alert.viewedAt && onAction ? (
+                <button
+                  type="button"
+                  className="mk-btn mk-btn-ghost"
+                  style={{ fontSize: 10 }}
+                  onClick={() => onAction(alert.id, 'view')}
+                >
+                  Mark viewed
+                </button>
+              ) : null}
+              {onAction ? (
+                <button
+                  type="button"
+                  className="mk-btn mk-btn-ghost"
+                  style={{ fontSize: 10 }}
+                  onClick={() => onAction(alert.id, 'dismiss')}
+                >
+                  Dismiss
+                </button>
+              ) : null}
+            </div>
+          </div>
+        )
+      })}
+
+      {dismissed.length > 0 ? (
+        <p style={{
+          fontFamily: 'var(--font-jetbrains-mono), monospace',
+          fontSize: 9, color: 'var(--muted-faint)', marginTop: 12, letterSpacing: '0.1em',
+        }}>
+          {dismissed.length} dismissed
+        </p>
+      ) : null}
+    </div>
+  )
 }
 
 // ─── Brand panel ─────────────────────────────────────────────────────────────
@@ -381,6 +516,8 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
     initialLibraryItems,
     brandSnapshot,
     onBrandChange,
+    leakAlerts,
+    onLeakAction,
   } = props
 
   // ── Divine pending queue ──────────────────────────────────────────────────
@@ -978,6 +1115,22 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
                   {label}
                 </button>
               ))}
+              {leakAlerts ? (
+                <button
+                  type="button"
+                  className={`mk-tab ${tab === 'leaks' ? 'mk-active' : ''}`}
+                  onClick={() => setTab('leaks')}
+                  style={{ position: 'relative' }}
+                >
+                  Leaks
+                  {leakAlerts.some(leakAlertNeedsAttention) ? (
+                    <span style={{
+                      position: 'absolute', top: 4, right: 4, width: 5, height: 5,
+                      borderRadius: '50%', background: 'var(--destructive)',
+                    }} />
+                  ) : null}
+                </button>
+              ) : null}
             </div>
             <div className="mk-panels studio-scrollbar">
               {tab === 'clip' ? (
@@ -1148,6 +1301,10 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
                   <p className="mk-desc">Embed after vault export.</p>
                   {ariadneBlock}
                 </div>
+              ) : null}
+
+              {tab === 'leaks' && leakAlerts ? (
+                <LeaksPanel alerts={leakAlerts} onAction={onLeakAction} />
               ) : null}
             </div>
           </aside>

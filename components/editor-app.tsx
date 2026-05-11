@@ -18,6 +18,7 @@ import type { LibraryItem } from '@/components/studio/markit-editor-v2'
 import type { BatchMediaItem } from '@/app/api/media/batch/route'
 import type { BrandSnapshot } from '@/lib/brand-contract'
 import { validateBrandSnapshot, defaultBrandSnapshot } from '@/lib/brand-contract'
+import type { LeakAlertView } from '@/lib/leak-alert-contract'
 import type { MarkitEditPlanV1 } from '@/lib/markit-edit-plan'
 import { useEditorShellStore } from '@/lib/stores/editor-shell-store'
 import { findLatestEditPlan, planNeedsSecondarySource } from '@/lib/markit-edit-plan'
@@ -116,6 +117,35 @@ export function EditorApp() {
         body: JSON.stringify(next),
       }).catch(() => {})
     }, 600)
+  }, [])
+
+  // Leak alerts — fetched on mount; dismiss/view actions patch via API.
+  const [leakAlerts, setLeakAlerts] = useState<LeakAlertView[] | undefined>(undefined)
+
+  useEffect(() => {
+    void fetch('/api/leaks')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body: { alerts?: LeakAlertView[] } | null) => {
+        if (body?.alerts) setLeakAlerts(body.alerts)
+      })
+      .catch(() => {})
+  }, [])
+
+  const handleLeakAction = useCallback((id: string, action: 'view' | 'dismiss') => {
+    void fetch(`/api/leaks/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    }).then(() => {
+      const now = new Date().toISOString()
+      setLeakAlerts((prev) =>
+        prev?.map((a) =>
+          a.id === id
+            ? { ...a, ...(action === 'view' ? { viewedAt: now } : { dismissedAt: now }) }
+            : a,
+        ),
+      )
+    }).catch(() => {})
   }, [])
 
   const [sessionUserId, setSessionUserId] = useState<string | null>(null)
@@ -982,6 +1012,8 @@ export function EditorApp() {
       initialLibraryItems={initialLibraryItems}
       brandSnapshot={brandEnabled ? brandSnapshot : undefined}
       onBrandChange={brandEnabled ? handleBrandChange : undefined}
+      leakAlerts={leakAlerts}
+      onLeakAction={handleLeakAction}
     />
   )
 }
