@@ -1334,6 +1334,20 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
                   </h4>
                   <p className="mk-desc">Embed after vault export.</p>
                   {ariadneBlock}
+                  {/* 🚨 append-v1 caveat — required before launch (v8-test-plan §3) */}
+                  <p
+                    style={{
+                      marginTop: 12,
+                      fontSize: 11,
+                      lineHeight: 1.55,
+                      color: 'var(--muted-foreground)',
+                      fontFamily: 'var(--font-jetbrains-mono), ui-monospace, monospace',
+                      letterSpacing: '0.02em',
+                    }}
+                  >
+                    v1 trace survives direct file shares and most platform re-uploads.
+                    Does not survive re-encoding or screenshots.
+                  </p>
                 </div>
               ) : null}
 
