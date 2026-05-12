@@ -4,7 +4,6 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BrandSeal } from '@/components/markit-v5/brand-seal'
-import { DivineOrb } from '@/components/markit-v5/divine-orb'
 import type { MarkitEditPlanV1 } from '@/lib/markit-edit-plan'
 import type { BrandSnapshot, BrandPlatform, BrandPosition } from '@/lib/brand-contract'
 import { validateBrandSnapshot, formatBrandHandle } from '@/lib/brand-contract'
@@ -13,6 +12,7 @@ import { classifyLeakAlertSeverity, leakAlertNeedsAttention } from '@/lib/leak-a
 import { MARKIT_OUTPUT_FORMATS, planNeedsSecondarySource } from '@/lib/markit-edit-plan'
 import { applyEditorDivineAction, makeDivineApplierContext } from '@/lib/markit-v5/divine-action-applier'
 import { useDivineQueueStore } from '@/lib/stores/divine-queue-store'
+import { DivineQueueBanner } from '@/components/studio/divine-queue-banner'
 import { useEditorShellStore } from '@/lib/stores/editor-shell-store'
 import type { TimelineSegment } from '@/lib/timeline-project'
 import { splitSegmentAtSec, rectForAspect, patchSegment } from '@/lib/timeline-project'
@@ -547,10 +547,7 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
 
   // ── Divine pending queue ──────────────────────────────────────────────────
   const divineQueue = useDivineQueueStore((s) => s.queue)
-  const divineConfirm = useDivineQueueStore((s) => s.confirm)
-  const divineDismiss = useDivineQueueStore((s) => s.dismiss)
   const topDivineItem = divineQueue[0] ?? null
-  const extraDivineCount = Math.max(0, divineQueue.length - 1)
 
   const density = useEditorShellStore((s) => s.density)
   const setDensity = useEditorShellStore((s) => s.setDensity)
@@ -834,54 +831,20 @@ export function MarkitEditorV2(props: MarkitEditorV2Props) {
         </div>
       </header>
 
-      {topDivineItem ? (
-        <div
-          className="flex min-h-0 items-center justify-between gap-2 border-b px-3 py-2"
-          style={{ borderColor: 'var(--border)', background: 'var(--card)' }}
-        >
-          <span className="flex min-w-0 items-center gap-2 text-xs text-[var(--muted-foreground)]">
-            <DivineOrb size="sm" />
-            <span className="min-w-0 truncate">
-              <span className="text-[var(--foreground)]">{topDivineItem.description}</span>
-              {extraDivineCount > 0 ? (
-                <span className="ml-2 rounded-full bg-[var(--border)] px-1.5 py-0.5 text-[10px] text-[var(--muted-foreground)]">
-                  +{extraDivineCount} more
-                </span>
-              ) : null}
-            </span>
-          </span>
-          <div className="flex shrink-0 flex-wrap gap-2">
-            <button
-              type="button"
-              className="mk-btn mk-btn-primary"
-              onClick={() => {
-                const item = divineConfirm(topDivineItem.id)
-                if (item) {
-                  applyEditorDivineAction(
-                    null,
-                    item.action,
-                    makeDivineApplierContext((t) => setTab(t), {
-                      segments: timelineSegments,
-                      setSegments: onTimelineSegmentsChange,
-                      setCropRect: onCropRectChange,
-                      onDmcaAction,
-                    }),
-                  )
-                }
-              }}
-            >
-              Apply
-            </button>
-            <button
-              type="button"
-              className="mk-btn"
-              onClick={() => divineDismiss(topDivineItem.id)}
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      ) : null}
+      <DivineQueueBanner
+        onApply={(action) =>
+          applyEditorDivineAction(
+            null,
+            action,
+            makeDivineApplierContext((t) => setTab(t), {
+              segments: timelineSegments,
+              setSegments: onTimelineSegmentsChange,
+              setCropRect: onCropRectChange,
+              onDmcaAction,
+            }),
+          )
+        }
+      />
 
       <div className="grid min-h-0 min-w-0 overflow-hidden max-[920px]:grid-cols-[200px_minmax(0,1fr)] min-[921px]:max-[1179px]:grid-cols-[220px_minmax(0,1fr)_290px] min-[1180px]:grid-cols-[260px_minmax(0,1fr)_320px]">
           <aside className="mk-library">

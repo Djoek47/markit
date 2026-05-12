@@ -14,6 +14,10 @@ import { applyBrandToOpenReelProject, resetBrandState } from '@/lib/openreel-bra
 import type { BrandSnapshot } from '@/lib/brand-contract'
 import { validateBrandSnapshot, defaultBrandSnapshot } from '@/lib/brand-contract'
 import type { BatchMediaItem } from '@/app/api/media/batch/route'
+import { DivineQueueBanner } from '@/components/studio/divine-queue-banner'
+import { applyDivineActionToOpenReel } from '@/lib/openreel-divine-adapter'
+import type { LeakAlertView } from '@/lib/leak-alert-contract'
+import { leakAlertNeedsAttention } from '@/lib/leak-alert-contract'
 
 type BridgeStatus = 'idle' | 'importing' | 'ready' | 'saving' | 'saved' | 'error'
 
@@ -348,6 +352,8 @@ async function bootstrapFromLibrary(ids: string[]): Promise<void> {
 export function OpenReelEditorClient() {
   const project = useProjectStore((s) => s.project)
   const [brandSnapshot, setBrandSnapshot] = useState<BrandSnapshot>(defaultBrandSnapshot())
+  const [leakAlerts, setLeakAlerts] = useState<LeakAlertView[]>([])
+  const [showLeaks, setShowLeaks] = useState(false)
 
   useEffect(() => {
     document.documentElement.classList.add('dark')
@@ -382,16 +388,120 @@ export function OpenReelEditorClient() {
       .catch(() => { /* non-fatal */ })
   }, [])
 
+  // Fetch leak alerts once on mount
+  useEffect(() => {
+    fetch('/api/leaks')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body: { alerts?: LeakAlertView[] } | null) => {
+        if (body?.alerts) setLeakAlerts(body.alerts)
+      })
+      .catch(() => { /* non-fatal */ })
+  }, [])
+
   // Re-apply brand overlay whenever snapshot or project changes
   useEffect(() => {
     void applyBrandToOpenReelProject(brandSnapshot)
   }, [brandSnapshot, project])
 
+  const activeLeakCount = leakAlerts.filter((a) => !a.dismissedAt).length
+  const leakNeedsAttention = leakAlerts.some(leakAlertNeedsAttention)
+
   return (
-    <div className="openreel-markit h-screen w-screen overflow-hidden bg-background text-text-primary">
+    <div style={{ position: 'relative', width: '100%', height: '100vh' }} className="openreel-markit bg-background text-text-primary overflow-hidden">
       <OpenReelApp />
       <CreatixBridge />
+
+      {/* Divine queue banner — fixed top, full width */}
+      <DivineQueueBanner
+        onApply={applyDivineActionToOpenReel}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 150,
+        }}
+      />
+
+      {/* Voice mic — bottom right */}
       <OpenReelVoiceOverlay />
+
+      {/* Leaks toggle button — bottom left */}
+      {activeLeakCount > 0 ? (
+        <button
+          type="button"
+          onClick={() => setShowLeaks((v) => !v)}
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            left: 24,
+            zIndex: 200,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '6px 12px',
+            borderRadius: 999,
+            border: '1px solid var(--border)',
+            background: 'var(--card)',
+            color: leakNeedsAttention ? 'var(--destructive)' : 'var(--muted-foreground)',
+            fontSize: 12,
+            cursor: 'pointer',
+          }}
+          aria-label={showLeaks ? 'Hide leak alerts' : 'Show leak alerts'}
+        >
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: leakNeedsAttention ? 'var(--destructive)' : 'var(--muted-foreground)' }} />
+          {activeLeakCount} leak{activeLeakCount !== 1 ? 's' : ''}
+        </button>
+      ) : null}
+
+      {/* Leaks inspector panel — toggled via floating button */}
+      {showLeaks && activeLeakCount > 0 ? (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 64,
+            left: 24,
+            zIndex: 200,
+            width: 320,
+            maxHeight: 480,
+            overflowY: 'auto',
+            borderRadius: 12,
+            border: '1px solid var(--border)',
+            background: 'var(--card)',
+            padding: 16,
+            boxShadow: '0 8px 32px rgb(0 0 0 / 0.4)',
+          }}
+        >
+          <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--foreground)', marginBottom: 12, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            Leak Monitor
+          </p>
+          {leakAlerts.filter((a) => !a.dismissedAt).map((alert) => (
+            <div
+              key={alert.id}
+              style={{
+                marginBottom: 10,
+                padding: '8px 10px',
+                borderRadius: 8,
+                border: '1px solid var(--border)',
+                borderLeft: `3px solid ${leakAlertNeedsAttention(alert) ? 'var(--destructive)' : 'var(--muted-foreground)'}`,
+                background: 'var(--background)',
+                fontSize: 11,
+                color: 'var(--muted-foreground)',
+              }}
+            >
+              <p style={{ fontWeight: 600, color: 'var(--foreground)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {alert.url}
+              </p>
+              {alert.attributedToRecipientLabel ? (
+                <p style={{ color: 'var(--accent)', fontSize: 10 }}>✦ {alert.attributedToRecipientLabel}</p>
+              ) : null}
+              <p style={{ fontSize: 10, marginTop: 4 }}>
+                {new Date(alert.detectedAt).toLocaleDateString()} · DMCA: {alert.dmcaState}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   )
 }
