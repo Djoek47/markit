@@ -15,7 +15,7 @@ import { applyEditorDivineAction, makeDivineApplierContext } from '@/lib/markit-
 import { useDivineQueueStore } from '@/lib/stores/divine-queue-store'
 import { useEditorShellStore } from '@/lib/stores/editor-shell-store'
 import type { TimelineSegment } from '@/lib/timeline-project'
-import { resizeSegmentEdge, splitSegmentAtSec, rectForAspect, patchSegment } from '@/lib/timeline-project'
+import { splitSegmentAtSec, rectForAspect, patchSegment } from '@/lib/timeline-project'
 
 export type InspectorTab = 'clip' | 'crop' | 'trim' | 'export' | 'trace' | 'leaks'
 

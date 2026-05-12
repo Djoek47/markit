@@ -1,5 +1,4 @@
-import { Suspense } from 'react'
-import { EditorApp } from '@/components/editor-app'
+import { OpenReelEditorLoader } from '@/components/openreel/openreel-editor-loader'
 
 export const metadata = {
   title: 'Markit — Editor (Beta) · Circe et Venus',
@@ -7,18 +6,5 @@ export const metadata = {
 }
 
 export default function EditorPage() {
-  return (
-    <Suspense
-      fallback={
-        <div
-          className="flex min-h-screen items-center justify-center px-4 text-sm"
-          style={{ color: 'var(--muted-foreground)' }}
-        >
-          Loading Markit…
-        </div>
-      }
-    >
-      <EditorApp />
-    </Suspense>
-  )
+  return <OpenReelEditorLoader />
 }

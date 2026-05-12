@@ -1,5 +1,46 @@
 @import 'tailwindcss';
 
+@source '../vendor/openreel';
+
+@theme {
+  --color-background: oklch(0.08 0 0);
+  --color-background-secondary: oklch(0.11 0.006 285);
+  --color-background-tertiary: oklch(0.15 0.01 285);
+  --color-background-elevated: oklch(0.2 0.012 285);
+  --color-foreground: oklch(0.95 0 0);
+  --color-card: oklch(0.12 0.005 285);
+  --color-card-foreground: oklch(0.95 0 0);
+  --color-popover: oklch(0.12 0.005 285);
+  --color-popover-foreground: oklch(0.95 0 0);
+  --color-primary: oklch(0.78 0.14 85);
+  --color-primary-foreground: oklch(0.1 0 0);
+  --color-primary-hover: oklch(0.85 0.12 85);
+  --color-primary-active: oklch(0.72 0.13 85);
+  --color-primary-glow: oklch(0.78 0.14 85 / 0.5);
+  --color-secondary: oklch(0.16 0.012 285);
+  --color-secondary-foreground: oklch(0.95 0 0);
+  --color-muted: oklch(0.16 0.005 285);
+  --color-muted-foreground: oklch(0.6 0 0);
+  --color-accent: oklch(0.55 0.2 295);
+  --color-accent-foreground: oklch(0.95 0 0);
+  --color-destructive: oklch(0.62 0.2 25);
+  --color-destructive-foreground: oklch(0.95 0 0);
+  --color-border: oklch(0.22 0.015 285);
+  --color-border-hover: oklch(0.32 0.018 285);
+  --color-border-active: oklch(0.42 0.02 285);
+  --color-input: oklch(0.22 0.015 285);
+  --color-ring: oklch(0.78 0.14 85);
+  --color-text-primary: oklch(0.95 0 0);
+  --color-text-secondary: oklch(0.66 0.01 285);
+  --color-text-muted: oklch(0.5 0.01 285);
+  --color-status-success: oklch(0.7 0.14 150);
+  --color-status-warning: oklch(0.78 0.14 85);
+  --color-status-error: oklch(0.62 0.2 25);
+  --color-status-info: oklch(0.65 0.15 295);
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -108,6 +149,560 @@
     --timeline-overlay: oklch(0.50 0.15 295 / 0.45);
     --divine-shadow: 0 12px 36px oklch(0.55 0.16 85 / 0.25);
   }
+}
+/* ── OpenReel / Markit studio skin ────────────────────────────────────────── */
+.openreel-markit {
+  --background: 260 8% 5%;
+  --foreground: 35 24% 94%;
+  --card: 260 9% 9%;
+  --card-foreground: 35 24% 94%;
+  --popover: 260 9% 9%;
+  --popover-foreground: 35 24% 94%;
+  --primary: 42 56% 60%;
+  --primary-foreground: 260 9% 6%;
+  --secondary: 265 10% 16%;
+  --secondary-foreground: 35 24% 94%;
+  --muted: 265 10% 16%;
+  --muted-foreground: 270 10% 66%;
+  --accent: 278 64% 58%;
+  --accent-foreground: 35 24% 94%;
+  --destructive: 0 72% 58%;
+  --destructive-foreground: 35 24% 94%;
+  --border: 265 11% 22%;
+  --input: 265 11% 22%;
+  --ring: 42 56% 60%;
+  --color-background: 13 13 15;
+  --color-background-secondary: 18 18 22;
+  --color-background-tertiary: 27 25 33;
+  --color-background-elevated: 42 38 50;
+  --color-text-primary: 242 239 233;
+  --color-text-secondary: 174 166 184;
+  --color-text-muted: 122 113 132;
+  --color-border: 52 47 61;
+  --color-border-hover: 82 73 96;
+  --color-border-active: 137 105 175;
+  color-scheme: dark;
+}
+
+.openreel-markit input:focus,
+.openreel-markit select:focus,
+.openreel-markit textarea:focus {
+  border-color: rgb(210 175 98);
+  box-shadow: 0 0 0 1px rgb(210 175 98);
+}
+
+/* OpenReel inside Markit: premium Circe studio skin.
+   Keep the editor mechanics intact; refine the surface, rhythm, and color. */
+.openreel-markit {
+  --mk-studio-black: 8 8 9;
+  --mk-studio-rail: 12 12 14;
+  --mk-studio-panel: 17 17 20;
+  --mk-studio-elevated: 24 24 28;
+  --mk-studio-hover: 31 31 36;
+  --mk-ivory: 244 241 235;
+  --mk-muted: 159 156 166;
+  --mk-faint: 102 99 111;
+  --mk-line: 255 255 255 / 0.075;
+  --mk-line-strong: 255 255 255 / 0.14;
+  --mk-gold: 219 183 102;
+  --mk-gold-soft: 232 205 141;
+  --mk-circe: 143 99 206;
+  --mk-circe-soft: 181 145 232;
+  --background: 0 0% 3%;
+  --foreground: 40 22% 94%;
+  --card: 240 8% 7%;
+  --card-foreground: 40 22% 94%;
+  --popover: 240 8% 8%;
+  --popover-foreground: 40 22% 94%;
+  --primary: 42 60% 63%;
+  --primary-foreground: 240 8% 5%;
+  --secondary: 250 8% 12%;
+  --secondary-foreground: 40 22% 94%;
+  --muted: 250 7% 13%;
+  --muted-foreground: 255 8% 64%;
+  --accent: 268 52% 62%;
+  --accent-foreground: 40 22% 94%;
+  --border: 255 255 255 / 0.075;
+  --input: 255 255 255 / 0.1;
+  --ring: 42 60% 63%;
+  --color-background: var(--mk-studio-black);
+  --color-background-secondary: var(--mk-studio-rail);
+  --color-background-tertiary: var(--mk-studio-panel);
+  --color-background-elevated: var(--mk-studio-elevated);
+  --color-text-primary: var(--mk-ivory);
+  --color-text-secondary: var(--mk-muted);
+  --color-text-muted: var(--mk-faint);
+  --color-border: 255 255 255 / 0.075;
+  --color-border-hover: 255 255 255 / 0.14;
+  --color-border-active: var(--mk-gold);
+  background: rgb(var(--mk-studio-black));
+  font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.openreel-markit *,
+.openreel-markit *::before,
+.openreel-markit *::after {
+  letter-spacing: 0;
+}
+
+.openreel-markit :where(.bg-background) {
+  background-color: rgb(var(--mk-studio-black)) !important;
+}
+
+.openreel-markit :where(.bg-background-secondary) {
+  background-color: rgb(var(--mk-studio-rail)) !important;
+}
+
+.openreel-markit :where(.bg-background-tertiary) {
+  background-color: rgb(var(--mk-studio-panel)) !important;
+}
+
+.openreel-markit :where(.bg-background-elevated) {
+  background-color: rgb(var(--mk-studio-elevated)) !important;
+}
+
+.openreel-markit :where(.border-border) {
+  border-color: rgb(var(--mk-line)) !important;
+}
+
+.openreel-markit :where(.text-text-primary) {
+  color: rgb(var(--mk-ivory)) !important;
+}
+
+.openreel-markit :where(.text-text-secondary) {
+  color: rgb(var(--mk-muted)) !important;
+}
+
+.openreel-markit :where(.text-text-muted) {
+  color: rgb(var(--mk-faint)) !important;
+}
+
+.openreel-markit :where(.text-primary) {
+  color: rgb(var(--mk-gold)) !important;
+}
+
+.openreel-markit :where(.bg-primary) {
+  background-color: rgb(var(--mk-gold)) !important;
+}
+
+.openreel-markit :where(.border-primary) {
+  border-color: rgb(var(--mk-gold)) !important;
+}
+
+.openreel-markit :where(.ring-primary, .ring-primary\/30, .ring-primary\/50) {
+  --tw-ring-color: rgb(var(--mk-gold) / 0.35) !important;
+}
+
+.openreel-markit :where(button, input, textarea, select, [role='button']) {
+  border-radius: 8px;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.openreel-markit :where(button):focus-visible,
+.openreel-markit :where(input, textarea, select):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px rgb(var(--mk-gold) / 0.7), 0 0 0 5px rgb(var(--mk-gold) / 0.12);
+}
+
+.openreel-markit :where(.shadow-lg, .shadow-xl, .shadow-2xl, .shadow-inner, .shadow-sm) {
+  box-shadow: none !important;
+}
+
+.openreel-markit [class*='shadow-\[0_0'],
+.openreel-markit [class*='shadow-\[0_-'],
+.openreel-markit [class*='shadow-\[0_0_20px'],
+.openreel-markit [class*='shadow-\[0_0_30px'] {
+  box-shadow: none !important;
+}
+
+.openreel-markit :where(.rounded-2xl, .rounded-xl, .rounded-lg) {
+  border-radius: 8px !important;
+}
+
+.openreel-markit :where(.h-16.border-b) {
+  min-height: 60px;
+  height: 60px;
+  padding-left: 18px;
+  padding-right: 18px;
+  background: rgb(var(--mk-studio-black) / 0.92) !important;
+  border-bottom-color: rgb(var(--mk-line)) !important;
+  backdrop-filter: blur(18px) saturate(1.15);
+}
+
+.openreel-markit :where(.h-16.border-b) svg {
+  stroke-width: 1.8;
+}
+
+.openreel-markit :where(.h-16.border-b) button:hover {
+  background-color: rgb(var(--mk-studio-hover) / 0.72) !important;
+}
+
+.openreel-markit :where(.h-16.border-b) .text-lg {
+  font-family: var(--font-cinzel), ui-serif, Georgia, serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: rgb(var(--mk-ivory)) !important;
+}
+
+.openreel-markit :where(.w-80.bg-background-secondary.border-r, .w-80.bg-background-secondary.border-l) {
+  width: 304px;
+  background: rgb(var(--mk-studio-rail)) !important;
+}
+
+.openreel-markit :where(.w-80.bg-background-secondary.border-r) {
+  border-right-color: rgb(var(--mk-line)) !important;
+}
+
+.openreel-markit :where(.w-80.bg-background-secondary.border-l) {
+  border-left-color: rgb(var(--mk-line)) !important;
+}
+
+.openreel-markit :where(.font-bold) {
+  font-weight: 600;
+}
+
+.openreel-markit :where(.text-lg.font-bold, h3.text-sm.font-bold) {
+  font-family: var(--font-cinzel), ui-serif, Georgia, serif;
+  font-weight: 500;
+}
+
+.openreel-markit :where(input, textarea) {
+  background-color: rgb(var(--mk-studio-panel)) !important;
+  border-color: rgb(var(--mk-line)) !important;
+  color: rgb(var(--mk-ivory)) !important;
+}
+
+.openreel-markit :where(input::placeholder, textarea::placeholder) {
+  color: rgb(var(--mk-faint)) !important;
+}
+
+.openreel-markit :where(input:focus, textarea:focus) {
+  border-color: rgb(var(--mk-gold) / 0.7) !important;
+  box-shadow: 0 0 0 1px rgb(var(--mk-gold) / 0.55) !important;
+}
+
+.openreel-markit :where(.bg-primary\/10) {
+  background-color: rgb(var(--mk-gold) / 0.08) !important;
+}
+
+.openreel-markit :where(.bg-primary\/20) {
+  background-color: rgb(var(--mk-gold) / 0.12) !important;
+}
+
+.openreel-markit :where(.bg-primary\/30) {
+  background-color: rgb(var(--mk-gold) / 0.18) !important;
+}
+
+.openreel-markit :where(.border-primary\/20, .border-primary\/30, .border-primary\/50) {
+  border-color: rgb(var(--mk-gold) / 0.28) !important;
+}
+
+.openreel-markit :where(.hover\:bg-primary\/20:hover, .hover\:bg-primary\/40:hover) {
+  background-color: rgb(var(--mk-gold) / 0.16) !important;
+}
+
+.openreel-markit :where(.hover\:border-primary\/50:hover, .group:hover .group-hover\:border-primary\/50) {
+  border-color: rgb(var(--mk-gold) / 0.4) !important;
+}
+
+.openreel-markit :where(.hover\:text-primary:hover, .group:hover .group-hover\:text-primary) {
+  color: rgb(var(--mk-gold)) !important;
+}
+
+.openreel-markit :where(.text-white) {
+  color: rgb(var(--mk-ivory)) !important;
+}
+
+.openreel-markit :where(.text-black) {
+  color: rgb(var(--mk-studio-black)) !important;
+}
+
+.openreel-markit :where(.bg-green-500, .bg-cyan-500, .bg-yellow-500) {
+  background-color: rgb(var(--mk-gold)) !important;
+}
+
+.openreel-markit :where(.bg-green-400, .bg-cyan-400, .bg-yellow-400) {
+  background-color: rgb(var(--mk-gold-soft)) !important;
+}
+
+.openreel-markit :where(.bg-green-500\/80, .bg-cyan-500\/80) {
+  background-color: rgb(var(--mk-gold) / 0.86) !important;
+}
+
+.openreel-markit :where(.bg-green-500\/10, .bg-green-500\/20, .bg-green-500\/30, .bg-cyan-500\/10, .bg-cyan-500\/20, .bg-cyan-500\/30) {
+  background-color: rgb(var(--mk-gold) / 0.12) !important;
+}
+
+.openreel-markit :where(.border-green-500, .border-cyan-500, .border-yellow-500) {
+  border-color: rgb(var(--mk-gold)) !important;
+}
+
+.openreel-markit :where(.border-green-400, .border-cyan-400, .border-yellow-400, .border-green-500\/20, .border-green-500\/30, .border-green-500\/50) {
+  border-color: rgb(var(--mk-gold) / 0.42) !important;
+}
+
+.openreel-markit :where(.text-green-500, .text-green-400, .text-green-300, .text-cyan-500, .text-cyan-400, .text-yellow-500, .text-yellow-400) {
+  color: rgb(var(--mk-gold)) !important;
+}
+
+.openreel-markit :where(.text-blue-400) {
+  color: rgb(var(--mk-circe-soft)) !important;
+}
+
+.openreel-markit :where(.hover\:bg-green-500:hover, .hover\:bg-cyan-500:hover, .hover\:bg-yellow-500:hover) {
+  background-color: rgb(var(--mk-gold-soft)) !important;
+}
+
+.openreel-markit :where(.animate-pulse) {
+  animation-duration: 2.6s;
+}
+
+.openreel-markit :where(.fixed.inset-0, [role='dialog']) {
+  backdrop-filter: blur(18px);
+}
+
+.openreel-markit :where([role='dialog'], .rounded-xl.bg-background-secondary, .rounded-lg.bg-background-secondary) {
+  border-color: rgb(var(--mk-line-strong)) !important;
+  background-color: rgb(var(--mk-studio-panel)) !important;
+}
+
+.openreel-markit :where(.custom-scrollbar) {
+  scrollbar-color: rgb(var(--mk-faint) / 0.55) transparent;
+  scrollbar-width: thin;
+}
+
+.openreel-markit :where(.custom-scrollbar::-webkit-scrollbar) {
+  width: 7px;
+  height: 7px;
+}
+
+.openreel-markit :where(.custom-scrollbar::-webkit-scrollbar-thumb) {
+  background: rgb(var(--mk-faint) / 0.45);
+  border-radius: 999px;
+}
+
+.openreel-markit :where(.h-12.border-b) {
+  height: 48px;
+  background-color: rgb(var(--mk-studio-rail)) !important;
+}
+
+.openreel-markit :where(.font-mono.text-primary) {
+  font-weight: 500;
+  color: rgb(var(--mk-gold-soft)) !important;
+}
+
+.openreel-markit canvas {
+  background: #000;
+}
+
+.openreel-markit :where(.aspect-video.bg-background-tertiary) {
+  background: rgb(var(--mk-studio-panel)) !important;
+}
+
+.openreel-markit :where(.fixed.top-16.right-0.bottom-0) {
+  top: 60px;
+  background-color: rgb(var(--mk-studio-panel)) !important;
+  border-left-color: rgb(var(--mk-line)) !important;
+}
+
+/* Portaled editor surfaces: Radix renders these outside `.openreel-markit`. */
+body.markit-editor-active {
+  --mk-studio-black: 8 8 9;
+  --mk-studio-rail: 12 12 14;
+  --mk-studio-panel: 17 17 20;
+  --mk-studio-elevated: 24 24 28;
+  --mk-studio-hover: 31 31 36;
+  --mk-ivory: 244 241 235;
+  --mk-muted: 159 156 166;
+  --mk-faint: 102 99 111;
+  --mk-line: 255 255 255 / 0.075;
+  --mk-line-strong: 255 255 255 / 0.14;
+  --mk-gold: 219 183 102;
+  --mk-gold-soft: 232 205 141;
+  --mk-circe: 143 99 206;
+  --mk-circe-soft: 181 145 232;
+  --popover: 240 8% 8%;
+  --popover-foreground: 40 22% 94%;
+  --accent: 42 60% 63%;
+  --accent-foreground: 240 8% 5%;
+  --muted: 250 7% 13%;
+  --muted-foreground: 255 8% 64%;
+  --border: 255 255 255 / 0.075;
+  --ring: 42 60% 63%;
+}
+
+body.markit-editor-active :where([role='menu'], [role='listbox'], [data-radix-popper-content-wrapper] > div) {
+  background-color: rgb(var(--mk-studio-panel) / 0.98) !important;
+  color: rgb(var(--mk-ivory)) !important;
+  border: 1px solid rgb(var(--mk-line-strong)) !important;
+  border-radius: 10px !important;
+  box-shadow:
+    0 18px 50px rgb(0 0 0 / 0.42),
+    0 1px 0 rgb(255 255 255 / 0.04) inset !important;
+  backdrop-filter: blur(18px) saturate(1.12);
+}
+
+body.markit-editor-active :where([role='menu'], [role='listbox']) {
+  padding: 6px !important;
+  scrollbar-color: rgb(var(--mk-faint) / 0.65) transparent;
+  scrollbar-width: thin;
+}
+
+body.markit-editor-active :where([role='menu'], [role='listbox'], [role='dialog'])::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+body.markit-editor-active :where([role='menu'], [role='listbox'], [role='dialog'])::-webkit-scrollbar-thumb {
+  background: rgb(var(--mk-faint) / 0.56);
+  border-radius: 999px;
+}
+
+body.markit-editor-active :where([role='menu'], [role='listbox'], [role='dialog'])::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body.markit-editor-active :where([role='menuitem'], [role='option'], [role='menuitemcheckbox'], [role='menuitemradio']) {
+  min-height: 32px;
+  border-radius: 7px !important;
+  color: rgb(var(--mk-muted)) !important;
+  font-size: 12px !important;
+  font-weight: 500;
+  outline: none;
+}
+
+body.markit-editor-active :where([role='menuitem'] svg, [role='option'] svg, [role='menuitemcheckbox'] svg, [role='menuitemradio'] svg) {
+  color: rgb(var(--mk-faint)) !important;
+  stroke-width: 1.8;
+}
+
+body.markit-editor-active :where([role='menuitem']:hover, [role='menuitem']:focus, [role='option']:hover, [role='option']:focus, [role='menuitemcheckbox']:hover, [role='menuitemcheckbox']:focus, [role='menuitemradio']:hover, [role='menuitemradio']:focus, [data-highlighted]) {
+  background-color: rgb(var(--mk-gold) / 0.11) !important;
+  color: rgb(var(--mk-ivory)) !important;
+}
+
+body.markit-editor-active :where([role='menuitem']:hover svg, [role='menuitem']:focus svg, [role='option']:hover svg, [role='option']:focus svg, [data-highlighted] svg) {
+  color: rgb(var(--mk-gold)) !important;
+}
+
+body.markit-editor-active :where([role='menuitem'][data-disabled], [role='option'][data-disabled]) {
+  opacity: 0.38 !important;
+}
+
+body.markit-editor-active :where([role='separator']) {
+  background-color: rgb(var(--mk-line)) !important;
+  margin: 6px -2px !important;
+}
+
+body.markit-editor-active :where([role='menu'] [class*='text-red'], [role='menuitem'].text-red-400) {
+  color: rgb(235 116 116) !important;
+}
+
+body.markit-editor-active :where([role='menu'] [class*='text-red']:hover, [role='menuitem'].text-red-400:hover, [role='menuitem'].text-red-400:focus) {
+  background-color: rgb(235 116 116 / 0.1) !important;
+  color: rgb(255 150 150) !important;
+}
+
+body.markit-editor-active :where([role='tooltip']) {
+  background-color: rgb(var(--mk-studio-elevated) / 0.98) !important;
+  color: rgb(var(--mk-ivory)) !important;
+  border: 1px solid rgb(var(--mk-line-strong)) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 14px 36px rgb(0 0 0 / 0.38) !important;
+  font-size: 11px !important;
+  font-weight: 500;
+  padding: 7px 10px !important;
+  backdrop-filter: blur(14px) saturate(1.1);
+}
+
+body.markit-editor-active :where([data-radix-dialog-overlay]) {
+  background: rgb(0 0 0 / 0.72) !important;
+  backdrop-filter: blur(18px) saturate(1.05);
+}
+
+body.markit-editor-active :where([role='dialog']) {
+  background-color: rgb(var(--mk-studio-panel)) !important;
+  color: rgb(var(--mk-ivory)) !important;
+  border: 1px solid rgb(var(--mk-line-strong)) !important;
+  border-radius: 14px !important;
+  box-shadow:
+    0 28px 90px rgb(0 0 0 / 0.58),
+    0 1px 0 rgb(255 255 255 / 0.04) inset !important;
+}
+
+body.markit-editor-active :where([role='dialog'] h1, [role='dialog'] h2, [role='dialog'] h3, [role='dialog'] [data-radix-dialog-title]) {
+  font-family: var(--font-cinzel), ui-serif, Georgia, serif;
+  font-weight: 500 !important;
+  color: rgb(var(--mk-ivory)) !important;
+}
+
+body.markit-editor-active :where([role='dialog'] p, [role='dialog'] label, [role='dialog'] span) {
+  letter-spacing: 0;
+}
+
+body.markit-editor-active :where([role='dialog'] input, [role='dialog'] textarea, [role='dialog'] button[role='combobox']) {
+  background-color: rgb(var(--mk-studio-elevated)) !important;
+  border-color: rgb(var(--mk-line)) !important;
+  color: rgb(var(--mk-ivory)) !important;
+  border-radius: 8px !important;
+}
+
+body.markit-editor-active :where([role='dialog'] input:focus, [role='dialog'] textarea:focus, [role='dialog'] button[role='combobox']:focus) {
+  border-color: rgb(var(--mk-gold) / 0.65) !important;
+  box-shadow: 0 0 0 1px rgb(var(--mk-gold) / 0.5) !important;
+  outline: none !important;
+}
+
+body.markit-editor-active :where([role='dialog'] button) {
+  border-radius: 8px !important;
+}
+
+body.markit-editor-active :where([role='dialog'] .bg-primary, [role='dialog'] button.bg-primary) {
+  background-color: rgb(var(--mk-gold)) !important;
+  color: rgb(var(--mk-studio-black)) !important;
+}
+
+body.markit-editor-active :where([role='dialog'] .text-primary) {
+  color: rgb(var(--mk-gold)) !important;
+}
+
+body.markit-editor-active :where([role='dialog'] .border-primary, [role='dialog'] .border-primary\/30, [role='dialog'] .border-primary\/50) {
+  border-color: rgb(var(--mk-gold) / 0.35) !important;
+}
+
+body.markit-editor-active :where([role='dialog'] .bg-background, [role='dialog'] .bg-background-secondary, [role='dialog'] .bg-background-tertiary) {
+  background-color: rgb(var(--mk-studio-elevated)) !important;
+}
+
+body.markit-editor-active :where([role='dialog'] .border-border) {
+  border-color: rgb(var(--mk-line)) !important;
+}
+
+body.markit-editor-active :where([role='dialog'] .text-text-secondary, [role='dialog'] .text-muted-foreground) {
+  color: rgb(var(--mk-muted)) !important;
+}
+
+body.markit-editor-active :where([role='dialog'] .text-text-muted) {
+  color: rgb(var(--mk-faint)) !important;
+}
+
+body.markit-editor-active :where([role='dialog'] .shadow-lg, [role='dialog'] .shadow-xl, [role='dialog'] .shadow-2xl, [role='dialog'] [class*='shadow-\[0_0']) {
+  box-shadow: none !important;
+}
+
+body.markit-editor-active :where([data-radix-popper-content-wrapper] .bg-green-500, [data-radix-popper-content-wrapper] .bg-cyan-500, [data-radix-popper-content-wrapper] .bg-yellow-500) {
+  background-color: rgb(var(--mk-gold)) !important;
+}
+
+body.markit-editor-active :where([data-radix-popper-content-wrapper] .text-green-400, [data-radix-popper-content-wrapper] .text-green-500, [data-radix-popper-content-wrapper] .text-cyan-400, [data-radix-popper-content-wrapper] .text-yellow-500) {
+  color: rgb(var(--mk-gold)) !important;
 }
 
 html {

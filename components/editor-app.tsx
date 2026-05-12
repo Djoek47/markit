@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { UIMessage } from 'ai'
 import { createClient } from '@/lib/supabase/client'
-import { isMarkitEditorEntitled } from '@/lib/billing'
 import { hasDivineVoicePremium } from '@/lib/premium-divine'
 import { useDivineActionStream } from '@/hooks/use-divine-action-stream'
 import { useMarkitDivineVoice } from '@/hooks/use-markit-divine-voice'
@@ -37,6 +36,9 @@ import { isFullFrameCrop } from '@/lib/crop-utils'
 import { interpretDetectResponse, formatVerdictLine, type DetectVerdict } from '@/lib/ariadne/detect-interpret'
 
 const CREATIX = process.env.NEXT_PUBLIC_CREATIX_APP_URL || 'https://www.circeetvenus.com'
+const HAS_SUPABASE_BROWSER_ENV = Boolean(
+  process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+)
 
 function editPlanOutputFromShell(): MarkitEditPlanV1['output'] {
   const s = useEditorShellStore.getState()
@@ -62,6 +64,11 @@ export function EditorApp() {
   const hasVaultBridge = Boolean(importUrl && exportUrl && exportToken)
   const hasSecondaryImport = Boolean(importUrl2)
   const contentId = useMemo(() => (exportUrl ? parseVaultContentIdFromExportUrl(exportUrl) : null), [exportUrl])
+  const localSourceObjectUrlRef = useRef<string | null>(null)
+  const localSourceBlobRef = useRef<Blob | null>(null)
+  const [localSourceUrl, setLocalSourceUrl] = useState<string | null>(null)
+  const activeImportUrl = localSourceUrl || importUrl
+  const hasEditableSource = Boolean(activeImportUrl)
 
   // Library bootstrap: when arriving from /library?from=library&ids=..., pre-populate the editor library sidebar.
   const fromLibrary = sp.get('from') === 'library'
@@ -174,12 +181,14 @@ export function EditorApp() {
   }, [])
 
   const [sessionUserId, setSessionUserId] = useState<string | null>(null)
-  const [paid, setPaid] = useState<boolean | null>(null)
   const [divineVoicePremium, setDivineVoicePremium] = useState<boolean | null>(null)
-  const [authReady, setAuthReady] = useState(false)
-  const [entitlementReady, setEntitlementReady] = useState(false)
+  const [authReady, setAuthReady] = useState(!HAS_SUPABASE_BROWSER_ENV)
+  const [entitlementReady, setEntitlementReady] = useState(!HAS_SUPABASE_BROWSER_ENV)
 
   useEffect(() => {
+    if (!HAS_SUPABASE_BROWSER_ENV) {
+      return
+    }
     const supabase = createClient()
     void supabase.auth.getSession().then(({ data: { session } }) => {
       setSessionUserId(session?.user?.id ?? null)
@@ -197,12 +206,16 @@ export function EditorApp() {
   useEffect(() => {
     if (!authReady) return
     if (!sessionUserId) {
-      setPaid(null)
       setDivineVoicePremium(null)
       setEntitlementReady(true)
       return
     }
     setEntitlementReady(false)
+    if (!HAS_SUPABASE_BROWSER_ENV) {
+      setDivineVoicePremium(null)
+      setEntitlementReady(true)
+      return
+    }
     const supabase = createClient()
     void supabase
       .from('subscriptions')
@@ -214,7 +227,6 @@ export function EditorApp() {
         if (error) {
           console.warn('[markit] subscriptions read failed', error.message)
         }
-        setPaid(isMarkitEditorEntitled(data))
         setDivineVoicePremium(hasDivineVoicePremium(data))
         setEntitlementReady(true)
       })
@@ -225,7 +237,7 @@ export function EditorApp() {
   const [exportBusy, setExportBusy] = useState(false)
   const [vaultUploadOk, setVaultUploadOk] = useState(false)
 
-  const canManualExport = hasVaultBridge
+  const canManualExport = hasVaultBridge || hasEditableSource
 
   /** POST one file to the primary vault slot (bridge). */
   const postFileToVault = useCallback(
@@ -266,7 +278,10 @@ export function EditorApp() {
   )
 
   const sendSourceToVault = useCallback(async () => {
-    if (!importUrl || !hasVaultBridge) return
+    if (!importUrl || !hasVaultBridge) {
+      setExportStatus('Vault upload is available only when Markit is opened from Creatix.')
+      return
+    }
     setExportBusy(true)
     setExportStatus(null)
     setVaultUploadOk(false)
@@ -388,6 +403,10 @@ export function EditorApp() {
         URL.revokeObjectURL(previewObjectUrlRef.current)
         previewObjectUrlRef.current = null
       }
+      if (localSourceObjectUrlRef.current) {
+        URL.revokeObjectURL(localSourceObjectUrlRef.current)
+        localSourceObjectUrlRef.current = null
+      }
     }
   }, [])
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -400,14 +419,56 @@ export function EditorApp() {
     setPreviewUrl(null)
   }, [])
 
+  const replaceLocalSource = useCallback(
+    (file: File) => {
+      clearPreview()
+      if (localSourceObjectUrlRef.current) {
+        URL.revokeObjectURL(localSourceObjectUrlRef.current)
+      }
+      const url = URL.createObjectURL(file)
+      localSourceObjectUrlRef.current = url
+      localSourceBlobRef.current = file
+      setLocalSourceUrl(url)
+      setVideoDuration(0)
+      setTimelineSegments([])
+      setVaultUploadOk(false)
+      setExportStatus(`${file.name} loaded. Add clips, preview, then export.`)
+    },
+    [clearPreview],
+  )
+
+  const readPrimarySourceBlob = useCallback(async () => {
+    if (localSourceBlobRef.current) {
+      return localSourceBlobRef.current
+    }
+    if (!importUrl) {
+      throw new Error('Import a video or open Markit from Media & vault first.')
+    }
+    const pres = await fetch(importUrl, { method: 'GET', mode: 'cors' })
+    if (!pres.ok) throw new Error(`Could not read main video (${pres.status}).`)
+    return pres.blob()
+  }, [importUrl])
+
+  const downloadLocalExport = useCallback((blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = fileName
+    anchor.rel = 'noopener'
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 30_000)
+  }, [])
+
   const runLocalPreview = useCallback(
     async (segments: TimelineSegment[]) => {
       if (segments.length === 0) {
         setExportStatus('Add clips or run a preset.')
         return
       }
-      if (!importUrl || !hasVaultBridge) {
-        setExportStatus('Open Markit from Media & vault to build a video preview.')
+      if (!hasEditableSource) {
+        setExportStatus('Import a video or open Markit from Media & vault to build a preview.')
         return
       }
       const d = videoDuration
@@ -425,9 +486,7 @@ export function EditorApp() {
           output: plan.output ?? editPlanOutputFromShell(),
         }
         setExportStatus('Loading video for preview…')
-        const pres = await fetch(importUrl, { method: 'GET', mode: 'cors' })
-        if (!pres.ok) throw new Error(`Could not read main video (${pres.status}).`)
-        const primaryBlob = await pres.blob()
+        const primaryBlob = await readPrimarySourceBlob()
         setExportStatus('Rendering cuts in your browser…')
         const out = await runMarkitEditPlan(primaryBlob, null, effectivePlan, (p) => {
           if (p.message) setExportStatus(p.message)
@@ -455,20 +514,21 @@ export function EditorApp() {
         // keep status messages only; no separate busy spinner in v2 shell
       }
     },
-    [cropRect, hasVaultBridge, importUrl, videoDuration],
+    [cropRect, hasEditableSource, readPrimarySourceBlob, videoDuration],
   )
 
   const executeEditPlan = useCallback(
     async (plan: MarkitEditPlanV1) => {
-      if (!importUrl || !hasVaultBridge) return
+      if (!hasEditableSource) {
+        setExportStatus('Import a video or open Markit from Media & vault first.')
+        return
+      }
       setExportBusy(true)
       setExportStatus(null)
       setVaultUploadOk(false)
       try {
         setExportStatus('Loading main video…')
-        const pres = await fetch(importUrl, { method: 'GET', mode: 'cors' })
-        if (!pres.ok) throw new Error(`Could not read main video (${pres.status}).`)
-        const primaryBlob = await pres.blob()
+        const primaryBlob = await readPrimarySourceBlob()
 
         let secondaryBlob: Blob | null = null
         if (planNeedsSecondarySource(plan)) {
@@ -499,6 +559,10 @@ export function EditorApp() {
         const file = new File([out], `${baseName}.mp4`, { type: 'video/mp4' })
         setExportStatus('Uploading to vault…')
         await postFileToVault(file)
+        if (!hasVaultBridge) {
+          downloadLocalExport(out, file.name)
+          setExportStatus('Export downloaded.')
+        }
       } catch (e) {
         console.error('[markit] edit export failed', e)
         const message =
@@ -515,7 +579,16 @@ export function EditorApp() {
         setExportBusy(false)
       }
     },
-    [cropRect, hasSecondaryImport, hasVaultBridge, importUrl, importUrl2, postFileToVault],
+    [
+      cropRect,
+      downloadLocalExport,
+      hasEditableSource,
+      hasSecondaryImport,
+      hasVaultBridge,
+      importUrl2,
+      postFileToVault,
+      readPrimarySourceBlob,
+    ],
   )
 
   const applyAiEditPlan = useCallback(async () => {
@@ -692,19 +765,24 @@ export function EditorApp() {
     [exportToken],
   )
 
-  const gateBlocked =
-    !hasVaultBridge && entitlementReady && (sessionUserId === null || paid === false)
-
   const onSignOut = useCallback(async () => {
+    if (!HAS_SUPABASE_BROWSER_ENV) {
+      setSessionUserId(null)
+      setDivineVoicePremium(null)
+      router.replace('/')
+      return
+    }
     await createClient().auth.signOut()
     setSessionUserId(null)
-    setPaid(null)
     setDivineVoicePremium(null)
     router.replace('/')
   }, [router])
 
   const getAccessToken = useCallback(
-    () => createClient().auth.getSession().then((r) => r.data.session?.access_token ?? null),
+    () =>
+      HAS_SUPABASE_BROWSER_ENV
+        ? createClient().auth.getSession().then((r) => r.data.session?.access_token ?? null)
+        : Promise.resolve(null),
     [],
   )
   const timelineSummary = useMemo(
@@ -911,7 +989,7 @@ export function EditorApp() {
     )
   }
 
-  if (gateBlocked) {
+  if (process.env.NEXT_PUBLIC_MARKIT_REQUIRE_SUBSCRIPTION === 'true') {
     return (
       <div className="flex min-h-[100dvh] flex-col bg-[var(--background)] px-4 py-16 text-[var(--foreground)]">
         <div className="mx-auto max-w-lg text-center">
@@ -948,7 +1026,7 @@ export function EditorApp() {
   return (
     <MarkitEditorV2
       creatixUrl={CREATIX}
-      importUrl={importUrl}
+      importUrl={activeImportUrl || ''}
       hasVaultSource={hasVaultBridge}
       sessionUserId={sessionUserId}
       onSignOut={onSignOut}
@@ -956,8 +1034,7 @@ export function EditorApp() {
       canExport={canManualExport}
       onSendSourceToVault={() => void sendSourceToVault()}
       onReplaceFile={(f) => {
-        clearPreview()
-        void pushFile(f)
+        replaceLocalSource(f)
       }}
       exportStatus={exportStatus}
       trimPanel={

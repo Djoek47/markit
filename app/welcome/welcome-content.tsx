@@ -2,12 +2,22 @@
 
 import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 
 const brandLogo = '/icon.png'
 const DEFAULT_NEXT = '/editor'
 const MS = 5300
 const MS_REDUCED = 600
+
+function subscribeReducedMotion(onStoreChange: () => void) {
+  const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+  mq.addEventListener('change', onStoreChange)
+  return () => mq.removeEventListener('change', onStoreChange)
+}
+
+function getReducedMotionSnapshot() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
 
 export function WelcomeContent() {
   const router = useRouter()
@@ -15,19 +25,11 @@ export function WelcomeContent() {
   const nextParam = sp.get('next')
   const next = nextParam && nextParam.startsWith('/') ? nextParam : DEFAULT_NEXT
   const [allowSkip, setAllowSkip] = useState(false)
-  const [reducedMotion, setReducedMotion] = useState(false)
+  const reducedMotion = useSyncExternalStore(subscribeReducedMotion, getReducedMotionSnapshot, () => false)
 
   const go = useCallback(() => {
     router.replace(next)
   }, [next, router])
-
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-    setReducedMotion(mq.matches)
-    const onChange = () => setReducedMotion(mq.matches)
-    mq.addEventListener('change', onChange)
-    return () => mq.removeEventListener('change', onChange)
-  }, [])
 
   const dwellMs = reducedMotion ? MS_REDUCED : MS
   const skipDelayMs = reducedMotion ? 0 : 800
