@@ -8,6 +8,8 @@ import { useUIStore } from '@/vendor/openreel/web/stores/ui-store'
 import { toast } from '@/vendor/openreel/web/stores/notification-store'
 import { getExportEngine, type ExportResult, type VideoExportSettings } from '@openreel/core'
 import { OpenReelVoiceOverlay } from '@/components/openreel/openreel-voice-overlay'
+import { useDivineQueueStore } from '@/lib/stores/divine-queue-store'
+import { runMarkitTraceFlow } from '@/lib/openreel-trace-flow'
 
 type BridgeStatus = 'idle' | 'importing' | 'ready' | 'saving' | 'saved' | 'error'
 
@@ -130,7 +132,20 @@ function CreatixBridge() {
   const [status, setStatus] = useState<BridgeStatus>(bridge ? 'importing' : 'idle')
   const [message, setMessage] = useState(bridge ? 'Opening from Creatix vault...' : '')
   const [progress, setProgress] = useState(0)
+  const [traceRecipient, setTraceRecipient] = useState<string | null>(null)
   const setGlobalExportState = useUIStore((state) => state.setExportState)
+  const { queue, confirm } = useDivineQueueStore()
+
+  // Auto-apply set_recipient actions from the divine queue (config, not a timeline edit)
+  useEffect(() => {
+    for (const item of queue) {
+      if (item.action.type === 'set_recipient') {
+        setTraceRecipient(item.action.recipientLabel)
+        confirm(item.id)
+        break
+      }
+    }
+  }, [queue, confirm])
 
   useEffect(() => {
     if (!bridge) return
@@ -225,11 +240,20 @@ function CreatixBridge() {
         },
       )
 
+      // Embed Ariadne trace before vault send if a recipient has been set
+      let vaultBlob = blob
+      if (traceRecipient) {
+        setMessage('Embedding Ariadne trace...')
+        const traceResult = await runMarkitTraceFlow(blob, traceRecipient)
+        const tracedRes = await fetch(traceResult.downloadUrl)
+        vaultBlob = await tracedRes.blob()
+      }
+
       setMessage('Saving to Creatix vault...')
       const formData = new FormData()
       formData.append('exportUrl', bridge.exportUrl)
       formData.append('exportToken', bridge.exportToken)
-      formData.append('file', new File([blob], `${project.name || 'markit-export'}.mp4`, { type: 'video/mp4' }))
+      formData.append('file', new File([vaultBlob], `${project.name || 'markit-export'}.mp4`, { type: 'video/mp4' }))
 
       const response = await fetch('/api/export', { method: 'POST', body: formData })
       const json = (await response.json().catch(() => ({}))) as { error?: string }
