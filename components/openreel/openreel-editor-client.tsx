@@ -10,6 +10,9 @@ import { getExportEngine, type ExportResult, type VideoExportSettings } from '@o
 import { OpenReelVoiceOverlay } from '@/components/openreel/openreel-voice-overlay'
 import { useDivineQueueStore } from '@/lib/stores/divine-queue-store'
 import { runMarkitTraceFlow } from '@/lib/openreel-trace-flow'
+import { applyBrandToOpenReelProject, resetBrandState } from '@/lib/openreel-brand-adapter'
+import type { BrandSnapshot } from '@/lib/brand-contract'
+import { validateBrandSnapshot, defaultBrandSnapshot } from '@/lib/brand-contract'
 
 type BridgeStatus = 'idle' | 'importing' | 'ready' | 'saving' | 'saved' | 'error'
 
@@ -308,6 +311,9 @@ function CreatixBridge() {
 }
 
 export function OpenReelEditorClient() {
+  const project = useProjectStore((s) => s.project)
+  const [brandSnapshot, setBrandSnapshot] = useState<BrandSnapshot>(defaultBrandSnapshot())
+
   useEffect(() => {
     document.documentElement.classList.add('dark')
     document.body.classList.add('markit-editor-active')
@@ -317,8 +323,25 @@ export function OpenReelEditorClient() {
 
     return () => {
       document.body.classList.remove('markit-editor-active')
+      resetBrandState()
     }
   }, [])
+
+  // Fetch brand settings once on mount
+  useEffect(() => {
+    fetch('/api/brand')
+      .then((r) => r.json())
+      .then((data: unknown) => {
+        const result = validateBrandSnapshot(data)
+        if (result.ok) setBrandSnapshot(result.snapshot)
+      })
+      .catch(() => { /* non-fatal */ })
+  }, [])
+
+  // Re-apply brand overlay whenever snapshot or project changes
+  useEffect(() => {
+    void applyBrandToOpenReelProject(brandSnapshot)
+  }, [brandSnapshot, project])
 
   return (
     <div className="openreel-markit h-screen w-screen overflow-hidden bg-background text-text-primary">
