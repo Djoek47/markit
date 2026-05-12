@@ -158,6 +158,18 @@ describe('applyDivineActionToOpenReel', () => {
     expect(mockStore.updateSettings).not.toHaveBeenCalled()
   })
 
+  it('set_crop_profile 4:5 updates project to Instagram dimensions', () => {
+    const handled = applyDivineActionToOpenReel({ type: 'set_crop_profile', profile: '4:5' })
+    expect(handled).toBe(true)
+    expect(mockStore.updateSettings).toHaveBeenCalledWith({ width: 1080, height: 1350 })
+  })
+
+  it('set_crop_profile 3:4 updates project correctly', () => {
+    const handled = applyDivineActionToOpenReel({ type: 'set_crop_profile', profile: '3:4' })
+    expect(handled).toBe(true)
+    expect(mockStore.updateSettings).toHaveBeenCalledWith({ width: 1080, height: 1440 })
+  })
+
   // ── crop_to_aspect ─────────────────────────────────────────────────────────
 
   it('crop_to_aspect 9:16-of maps to portrait dimensions', () => {
@@ -178,6 +190,46 @@ describe('applyDivineActionToOpenReel', () => {
     })
     expect(handled).toBe(true)
     expect(mockStore.updateSettings).toHaveBeenCalledWith({ width: 1080, height: 1920 })
+  })
+
+  it('crop_to_aspect 9:16 maps to portrait dimensions', () => {
+    const handled = applyDivineActionToOpenReel({
+      type: 'crop_to_aspect',
+      segmentId: 'clip-1',
+      aspect: '9:16',
+    })
+    expect(handled).toBe(true)
+    expect(mockStore.updateSettings).toHaveBeenCalledWith({ width: 1080, height: 1920 })
+  })
+
+  it('crop_to_aspect 16:9 maps to landscape dimensions', () => {
+    const handled = applyDivineActionToOpenReel({
+      type: 'crop_to_aspect',
+      segmentId: 'clip-1',
+      aspect: '16:9',
+    })
+    expect(handled).toBe(true)
+    expect(mockStore.updateSettings).toHaveBeenCalledWith({ width: 1920, height: 1080 })
+  })
+
+  it('crop_to_aspect 1:1 maps to square dimensions', () => {
+    const handled = applyDivineActionToOpenReel({
+      type: 'crop_to_aspect',
+      segmentId: 'clip-1',
+      aspect: '1:1',
+    })
+    expect(handled).toBe(true)
+    expect(mockStore.updateSettings).toHaveBeenCalledWith({ width: 1080, height: 1080 })
+  })
+
+  it('crop_to_aspect 4:5 maps to Instagram dimensions', () => {
+    const handled = applyDivineActionToOpenReel({
+      type: 'crop_to_aspect',
+      segmentId: 'clip-1',
+      aspect: '4:5',
+    })
+    expect(handled).toBe(true)
+    expect(mockStore.updateSettings).toHaveBeenCalledWith({ width: 1080, height: 1350 })
   })
 
   it('crop_to_aspect original returns false', () => {
@@ -210,6 +262,47 @@ describe('applyDivineActionToOpenReel', () => {
       type: 'set_recipient',
       recipientLabel: 'Alice',
     })
+    expect(handled).toBe(false)
+  })
+
+  it('set_clip_speed falls through (alias for set_segment_speed)', () => {
+    const handled = applyDivineActionToOpenReel({
+      type: 'set_clip_speed',
+      segmentId: 'clip-1',
+      speedPct: 150,
+    })
+    expect(handled).toBe(false)
+  })
+
+  it('reorder_segment falls through (complex timing)', () => {
+    const handled = applyDivineActionToOpenReel({
+      type: 'reorder_segment',
+      segmentId: 'clip-1',
+      toIndex: 1,
+    })
+    expect(handled).toBe(false)
+  })
+
+  it('auto_trim_silence falls through (intensity scan required)', () => {
+    const handled = applyDivineActionToOpenReel({
+      type: 'auto_trim_silence',
+      segmentId: 'clip-1',
+    })
+    expect(handled).toBe(false)
+  })
+
+  it('noop falls through', () => {
+    const handled = applyDivineActionToOpenReel({ type: 'noop' })
+    expect(handled).toBe(false)
+  })
+
+  it('library_search falls through (library nav)', () => {
+    const handled = applyDivineActionToOpenReel({ type: 'library_search', query: 'test' })
+    expect(handled).toBe(false)
+  })
+
+  it('start_export falls through (v8 export domain)', () => {
+    const handled = applyDivineActionToOpenReel({ type: 'start_export', confirm: true })
     expect(handled).toBe(false)
   })
 
