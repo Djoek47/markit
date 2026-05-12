@@ -13,6 +13,7 @@ import { runMarkitTraceFlow } from '@/lib/openreel-trace-flow'
 import { applyBrandToOpenReelProject, resetBrandState } from '@/lib/openreel-brand-adapter'
 import type { BrandSnapshot } from '@/lib/brand-contract'
 import { validateBrandSnapshot, defaultBrandSnapshot } from '@/lib/brand-contract'
+import type { BatchMediaItem } from '@/app/api/media/batch/route'
 
 type BridgeStatus = 'idle' | 'importing' | 'ready' | 'saving' | 'saved' | 'error'
 
@@ -310,6 +311,40 @@ function CreatixBridge() {
   )
 }
 
+async function bootstrapFromLibrary(ids: string[]): Promise<void> {
+  const res = await fetch(`/api/media/batch?ids=${ids.join(',')}`)
+  if (!res.ok) return
+  const { items } = (await res.json()) as { items: BatchMediaItem[] }
+  if (!items?.length) return
+
+  toast.info('Importing library media', `Loading ${items.length} item(s) into your timeline…`)
+
+  let cursor = 0
+  for (const item of items) {
+    if (!item.signedUrl) continue
+    try {
+      const blobRes = await fetch(item.signedUrl)
+      if (!blobRes.ok) continue
+      const blob = await blobRes.blob()
+      const file = new File([blob], item.name, { type: blob.type || 'video/mp4' })
+
+      const store = useProjectStore.getState()
+      const result = await store.importMedia(file)
+      if (!result.success || !result.actionId) continue
+
+      await store.addClipToNewTrack(result.actionId, cursor)
+
+      // Advance cursor by clip duration (duration_sec is a numeric string from the DB)
+      const durationMs = item.duration_sec ? parseFloat(item.duration_sec) * 1000 : 5_000
+      cursor += durationMs
+    } catch {
+      // Non-fatal — skip this item and continue with the rest
+    }
+  }
+
+  toast.success('Library media loaded', `${items.length} item(s) added to the timeline.`)
+}
+
 export function OpenReelEditorClient() {
   const project = useProjectStore((s) => s.project)
   const [brandSnapshot, setBrandSnapshot] = useState<BrandSnapshot>(defaultBrandSnapshot())
@@ -325,6 +360,15 @@ export function OpenReelEditorClient() {
       document.body.classList.remove('markit-editor-active')
       resetBrandState()
     }
+  }, [])
+
+  // Bootstrap from library when ?from=library&ids= is present
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('from') !== 'library') return
+    const ids = params.get('ids')?.split(',').filter(Boolean) ?? []
+    if (ids.length === 0) return
+    void bootstrapFromLibrary(ids)
   }, [])
 
   // Fetch brand settings once on mount
