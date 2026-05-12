@@ -7,6 +7,7 @@ import { useProjectStore } from '@/vendor/openreel/web/stores/project-store'
 import { useUIStore } from '@/vendor/openreel/web/stores/ui-store'
 import { toast } from '@/vendor/openreel/web/stores/notification-store'
 import { getExportEngine, type ExportResult, type VideoExportSettings } from '@openreel/core'
+import { OpenReelVoiceOverlay } from '@/components/openreel/openreel-voice-overlay'
 
 type BridgeStatus = 'idle' | 'importing' | 'ready' | 'saving' | 'saved' | 'error'
 
@@ -299,6 +300,7 @@ export function OpenReelEditorClient() {
     <div className="openreel-markit h-screen w-screen overflow-hidden bg-background text-text-primary">
       <OpenReelApp />
       <CreatixBridge />
+      <OpenReelVoiceOverlay />
     </div>
   )
 }
