@@ -12,6 +12,7 @@
     "test:forensics-benchmark": "tsx scripts/forensics-benchmark.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "@gsap/react": "^2.1.2",
@@ -46,6 +47,7 @@
     "mediabunny": "^1.44.2",
     "motion": "^12.38.0",
     "next": "16.2.4",
+    "openai": "^4.100.0",
     "posthog-js": "^1.372.10",
     "react": "19.2.4",
     "react-dom": "19.2.4",
