@@ -202,12 +202,19 @@ export function TracePageClient() {
   const busy = stage === 'preparing' || stage === 'uploading' || stage === 'embedding'
 
   return (
-    <main className="min-h-[100dvh] bg-[var(--background)] px-6 py-12 text-[var(--foreground)]">
+    <div className="markit-shell flex min-h-dvh flex-col" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+      <header className="mk-header">
+        <div className="mk-h-left">
+          <span className="mk-brand">Markit <span className="mk-sep">·</span></span>
+          <span style={{ fontFamily: 'var(--font-cinzel), serif', fontSize: 15, fontStyle: 'italic', color: 'var(--accent)' }}>Trace</span>
+        </div>
+        <div className="mk-h-right">
+          <Link href="/editor" className="mk-btn">← Editor</Link>
+        </div>
+      </header>
+      <main className="flex-1 px-6 py-12">
       <div className="mx-auto max-w-2xl">
         <div className="mb-8">
-          <p className="font-mono-ui mb-3 text-[10px] uppercase tracking-[0.32em] text-[var(--primary)]">
-            Markit · Trace
-          </p>
           <h1 className="font-serif-display text-4xl">Forensic-trace a video</h1>
           <p className="mt-2 text-sm text-[var(--muted-foreground)]">
             Drop a video, type a recipient, download a uniquely marked copy. If the file leaks,{' '}
@@ -357,6 +364,7 @@ export function TracePageClient() {
           </div>
         ) : null}
       </div>
-    </main>
+      </main>
+    </div>
   )
 }

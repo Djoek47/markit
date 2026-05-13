@@ -138,16 +138,25 @@ export function DetectPageClient() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-12">
-      {/* Header */}
-      <div className="space-y-3 text-center">
-        <h1 className="font-serif-display text-5xl font-bold" style={{ color: 'var(--primary)' }}>
-          Verify a Leak
-        </h1>
-        <p className="text-lg" style={{ color: 'var(--muted-foreground)' }}>
-          Drop a video. We extract its marker and tell you who it was sent to.
-        </p>
-      </div>
+    <div className="markit-shell flex min-h-dvh flex-col" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+      <header className="mk-header">
+        <div className="mk-h-left">
+          <span className="mk-brand">Markit <span className="mk-sep">·</span></span>
+          <span style={{ fontFamily: 'var(--font-cinzel), serif', fontSize: 15, fontStyle: 'italic', color: 'var(--accent)' }}>Detect</span>
+        </div>
+        <div className="mk-h-right">
+          <Link href="/editor" className="mk-btn">← Editor</Link>
+        </div>
+      </header>
+      <main className="flex-1 px-6 py-12">
+      <div className="mx-auto max-w-2xl space-y-12">
+        {/* Page title */}
+        <div className="space-y-3 text-center">
+          <h1 className="font-serif-display text-4xl">Verify a Leak</h1>
+          <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
+            Drop a video. We extract its marker and tell you who it was sent to.
+          </p>
+        </div>
 
       {/* Drop Zone */}
       <div
@@ -155,12 +164,13 @@ export function DetectPageClient() {
         onDrop={onDrop}
         onDragOver={(e) => {
           e.preventDefault()
-          dropRef.current?.classList.add('border-amber-400')
+          if (dropRef.current) dropRef.current.style.borderColor = 'var(--primary)'
         }}
         onDragLeave={() => {
-          dropRef.current?.classList.remove('border-amber-400')
+          if (dropRef.current) dropRef.current.style.borderColor = file ? 'var(--primary)' : 'var(--border)'
         }}
-        className="cursor-pointer space-y-4 rounded-lg border-2 border-dashed border-gray-600 bg-slate-800/50 p-12 text-center transition-colors hover:border-amber-400 hover:bg-slate-700/50"
+        className="cursor-pointer space-y-4 rounded-lg border-2 border-dashed p-12 text-center transition-colors"
+        style={{ borderColor: file ? 'var(--primary)' : 'var(--border)', background: file ? 'color-mix(in oklch, var(--primary) 6%, transparent)' : 'var(--card)' }}
         onClick={() => inputRef.current?.click()}
       >
         <div className="text-4xl">📹</div>
@@ -192,14 +202,14 @@ export function DetectPageClient() {
 
       {/* Error Display */}
       {errorMsg && (
-        <div className="rounded-lg border border-red-700/50 bg-red-900/20 p-4">
-          <p className="text-sm text-red-200">{errorMsg}</p>
+        <div className="rounded-lg border p-4" style={{ borderColor: 'var(--destructive)', background: 'color-mix(in oklch, var(--destructive) 10%, transparent)' }}>
+          <p className="text-sm" style={{ color: 'var(--destructive)' }}>{errorMsg}</p>
         </div>
       )}
 
       {/* Verdict Display */}
       {result && (
-        <div className="space-y-4 rounded-lg bg-slate-700/30 p-6">
+        <div className="space-y-4 rounded-lg p-6" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
           {result.verdict.kind === 'identified' ? (
             <>
               <p className="text-sm font-medium" style={{ color: 'var(--muted-foreground)' }}>
@@ -259,12 +269,14 @@ export function DetectPageClient() {
       </div>
 
       {/* Caveat */}
-      <div className="rounded-lg bg-slate-700/20 p-4">
+      <div className="rounded-lg p-4" style={{ background: 'var(--card-2)', border: '1px solid var(--border-soft)' }}>
         <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
           Append-v1 markers survive direct file shares and most platform re-uploads (MP4 → MP4 with no
           re-encode), but do not survive re-encoding, format conversion, or significant edits.
         </p>
       </div>
+      </div>
+      </main>
     </div>
   )
 }

@@ -101,6 +101,22 @@
   --timeline-audio: oklch(0.55 0.2 295 / 0.5);
   --timeline-overlay: oklch(0.65 0.15 295 / 0.45);
   --divine-shadow: 0 12px 36px oklch(0.78 0.14 85 / 0.35);
+
+  /* ── Studio skin tokens (available globally for portal menus on all pages) */
+  --mk-studio-black: 8 8 9;
+  --mk-studio-rail: 12 12 14;
+  --mk-studio-panel: 17 17 20;
+  --mk-studio-elevated: 24 24 28;
+  --mk-studio-hover: 31 31 36;
+  --mk-ivory: 244 241 235;
+  --mk-muted: 159 156 166;
+  --mk-faint: 102 99 111;
+  --mk-line: 255 255 255 / 0.075;
+  --mk-line-strong: 255 255 255 / 0.14;
+  --mk-gold: 219 183 102;
+  --mk-gold-soft: 232 205 141;
+  --mk-circe: 143 99 206;
+  --mk-circe-soft: 181 145 232;
 }
 
 /* ── Light mode ─────────────────────────────────────────────────────────── */
@@ -705,6 +721,116 @@ body.markit-editor-active :where([data-radix-popper-content-wrapper] .text-green
   color: rgb(var(--mk-gold)) !important;
 }
 
+/* ── Global studio skin for portaled Radix surfaces (all pages) ─────────── */
+body.markit-app :where([role='menu'], [role='listbox'], [data-radix-popper-content-wrapper] > div) {
+  background-color: rgb(var(--mk-studio-panel) / 0.98) !important;
+  color: rgb(var(--mk-ivory)) !important;
+  border: 1px solid rgb(var(--mk-line-strong)) !important;
+  border-radius: 10px !important;
+  box-shadow:
+    0 18px 50px rgb(0 0 0 / 0.42),
+    0 1px 0 rgb(255 255 255 / 0.04) inset !important;
+  backdrop-filter: blur(18px) saturate(1.12);
+}
+
+body.markit-app :where([role='menu'], [role='listbox']) {
+  padding: 6px !important;
+  scrollbar-color: rgb(var(--mk-faint) / 0.65) transparent;
+  scrollbar-width: thin;
+}
+
+body.markit-app :where([role='menu'], [role='listbox'], [role='dialog'])::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+body.markit-app :where([role='menu'], [role='listbox'], [role='dialog'])::-webkit-scrollbar-thumb {
+  background: rgb(var(--mk-faint) / 0.56);
+  border-radius: 999px;
+}
+
+body.markit-app :where([role='menu'], [role='listbox'], [role='dialog'])::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body.markit-app :where([role='menuitem'], [role='option'], [role='menuitemcheckbox'], [role='menuitemradio']) {
+  min-height: 32px;
+  border-radius: 7px !important;
+  color: rgb(var(--mk-muted)) !important;
+  font-size: 12px !important;
+  font-weight: 500;
+  outline: none;
+}
+
+body.markit-app :where([role='menuitem'] svg, [role='option'] svg, [role='menuitemcheckbox'] svg, [role='menuitemradio'] svg) {
+  color: rgb(var(--mk-faint)) !important;
+  stroke-width: 1.8;
+}
+
+body.markit-app :where([role='menuitem']:hover, [role='menuitem']:focus, [role='option']:hover, [role='option']:focus, [role='menuitemcheckbox']:hover, [role='menuitemcheckbox']:focus, [role='menuitemradio']:hover, [role='menuitemradio']:focus, [data-highlighted]) {
+  background-color: rgb(var(--mk-gold) / 0.11) !important;
+  color: rgb(var(--mk-ivory)) !important;
+}
+
+body.markit-app :where([role='menuitem']:hover svg, [role='menuitem']:focus svg, [role='option']:hover svg, [role='option']:focus svg, [data-highlighted] svg) {
+  color: rgb(var(--mk-gold)) !important;
+}
+
+body.markit-app :where([role='menuitem'][data-disabled], [role='option'][data-disabled]) {
+  opacity: 0.38 !important;
+}
+
+body.markit-app :where([role='separator']) {
+  background-color: rgb(var(--mk-line)) !important;
+  margin: 6px -2px !important;
+}
+
+body.markit-app :where([role='tooltip']) {
+  background-color: rgb(var(--mk-studio-elevated) / 0.98) !important;
+  color: rgb(var(--mk-ivory)) !important;
+  border: 1px solid rgb(var(--mk-line-strong)) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 14px 36px rgb(0 0 0 / 0.38) !important;
+  font-size: 11px !important;
+  font-weight: 500;
+  padding: 7px 10px !important;
+  backdrop-filter: blur(14px) saturate(1.1);
+}
+
+body.markit-app :where([data-radix-dialog-overlay]) {
+  background: rgb(0 0 0 / 0.72) !important;
+  backdrop-filter: blur(18px) saturate(1.05);
+}
+
+body.markit-app :where([role='dialog']) {
+  background-color: rgb(var(--mk-studio-panel)) !important;
+  color: rgb(var(--mk-ivory)) !important;
+  border: 1px solid rgb(var(--mk-line-strong)) !important;
+  border-radius: 14px !important;
+  box-shadow:
+    0 28px 90px rgb(0 0 0 / 0.58),
+    0 1px 0 rgb(255 255 255 / 0.04) inset !important;
+}
+
+body.markit-app :where([role='dialog'] h1, [role='dialog'] h2, [role='dialog'] h3, [role='dialog'] [data-radix-dialog-title]) {
+  font-family: var(--font-cinzel), ui-serif, Georgia, serif;
+  font-weight: 500 !important;
+  color: rgb(var(--mk-ivory)) !important;
+}
+
+body.markit-app :where([role='dialog'] input, [role='dialog'] textarea, [role='dialog'] button[role='combobox']) {
+  background-color: rgb(var(--mk-studio-elevated)) !important;
+  border-color: rgb(var(--mk-line)) !important;
+  color: rgb(var(--mk-ivory)) !important;
+  border-radius: 8px !important;
+}
+
+body.markit-app :where([role='dialog'] input:focus, [role='dialog'] textarea:focus, [role='dialog'] button[role='combobox']:focus) {
+  border-color: rgb(var(--mk-gold) / 0.65) !important;
+  box-shadow: 0 0 0 1px rgb(var(--mk-gold) / 0.5) !important;
+  outline: none !important;
+}
+
 html {
   color-scheme: dark;
 }
@@ -874,6 +1000,40 @@ body {
 .markit-shell .mk-btn-ghost:hover {
   color: var(--foreground);
   border-color: var(--border);
+}
+
+.markit-shell select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: rgb(var(--mk-studio-panel));
+  color: rgb(var(--mk-ivory));
+  border: 1px solid rgb(var(--mk-line-strong));
+  border-radius: 6px;
+  padding: 4px 24px 4px 8px;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23dbb766'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.markit-shell select:focus {
+  outline: none;
+  border-color: rgb(var(--mk-gold) / 0.7);
+  box-shadow: 0 0 0 1px rgb(var(--mk-gold) / 0.5);
+}
+
+.markit-shell select:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.markit-shell select option {
+  background-color: rgb(var(--mk-studio-elevated));
+  color: rgb(var(--mk-ivory));
 }
 
 .markit-shell .mk-library {
