@@ -4,32 +4,10 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-type SignUploadResponse = {
-  ok: true
-  uploadId: string
-  uploadUrl: string
-  uploadToken: string
-  sourcePath: string
-  bucket: string
-  expiresAt: string
-}
-
-type EmbedResponse = {
-  ok: true
-  payloadId: string
-  recipientLabel: string
-  downloadUrl: string
-  downloadFilename: string
-  expiresAt: string
-  algorithmVersion: string
-  sourceSha256: string
-  outputSha256: string
-}
-
-type Stage = 'idle' | 'preparing' | 'uploading' | 'embedding' | 'done' | 'error'
+type Stage = 'idle' | 'tracing' | 'done' | 'error'
 
 const ACCEPTED_MIME = 'video/mp4,video/quicktime,video/webm,video/x-matroska'
-const MAX_BYTES = 1024 * 1024 * 1024 // 1 GB — matches server-side cap
+const MAX_BYTES = 1024 * 1024 * 1024
 
 function fmtBytes(n: number): string {
   if (n < 1024) return `${n} B`
@@ -38,22 +16,16 @@ function fmtBytes(n: number): string {
   return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`
 }
 
-function extFromName(name: string): string {
-  const m = name.toLowerCase().match(/\.([a-z0-9]{2,5})$/)
-  return m ? m[1] : 'mp4'
-}
-
 export function TracePageClient() {
   const [authReady, setAuthReady] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
-
   const [file, setFile] = useState<File | null>(null)
   const [recipient, setRecipient] = useState('')
   const [stage, setStage] = useState<Stage>('idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [progress, setProgress] = useState(0)
-  const [result, setResult] = useState<EmbedResponse | null>(null)
-  const dropRef = useRef<HTMLDivElement | null>(null)
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
+  const [downloadName, setDownloadName] = useState<string>('traced.mp4')
+  const [payloadId, setPayloadId] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -68,15 +40,21 @@ export function TracePageClient() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Clean up blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (downloadUrl?.startsWith('blob:')) URL.revokeObjectURL(downloadUrl)
+    }
+  }, [downloadUrl])
+
   const handleSelectFile = (next: File | null) => {
     setErrorMsg(null)
-    setResult(null)
-    if (!next) {
-      setFile(null)
-      return
-    }
+    setDownloadUrl(null)
+    setPayloadId(null)
+    setStage('idle')
+    if (!next) { setFile(null); return }
     if (next.size > MAX_BYTES) {
-      setErrorMsg(`File too large (${fmtBytes(next.size)} > ${fmtBytes(MAX_BYTES)})`)
+      setErrorMsg(`File too large (${fmtBytes(next.size)} > 1 GB)`)
       return
     }
     setFile(next)
@@ -88,94 +66,67 @@ export function TracePageClient() {
     if (dropped) handleSelectFile(dropped)
   }, [])
 
-  const onSign = useCallback(async () => {
-    if (!file || !recipient.trim() || !userId) return
+  /** Download to PC — v1 append marker, no Creatix, no intermediate storage */
+  const onTraceDownload = useCallback(async () => {
+    if (!file || !recipient.trim()) return
     setErrorMsg(null)
-    setResult(null)
-    setProgress(0)
-    setStage('preparing')
+    setDownloadUrl(null)
+    setPayloadId(null)
+    setStage('tracing')
 
     try {
-      // 1. Reserve an upload slot.
-      const signRes = await fetch('/api/trace/sign-upload', {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('recipientLabel', recipient.trim())
+
+      const res = await fetch('/api/trace/embed-direct', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          filename: file.name,
-          sizeBytes: file.size,
-          contentType: file.type || 'video/mp4',
-        }),
+        body: form,
       })
-      const signData = (await signRes.json().catch(() => ({}))) as
-        | SignUploadResponse
-        | { error?: string }
-      if (!signRes.ok || !('ok' in signData)) {
-        const msg = (signData as { error?: string }).error || `Sign-upload failed (${signRes.status})`
-        throw new Error(msg)
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string }
+        throw new Error(err.error ?? `Trace failed (${res.status})`)
       }
 
-      // 2. Direct-upload the file to Supabase Storage via the signed URL.
-      setStage('uploading')
-      const supabase = createClient()
-      const uploadResult = await supabase.storage
-        .from(signData.bucket)
-        .uploadToSignedUrl(signData.sourcePath, signData.uploadToken, file, {
-          contentType: file.type || 'video/mp4',
-          upsert: true,
-        })
-      if (uploadResult.error) {
-        throw new Error(`Upload failed: ${uploadResult.error.message}`)
-      }
-      if (!uploadResult.data?.path) {
-        throw new Error('Upload completed but storage returned no path — please retry.')
-      }
-      setProgress(60)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const pid = res.headers.get('X-Payload-Id') ?? ''
+      const fname =
+        res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1]
+        ?? `traced_${Date.now()}.mp4`
 
-      // 3. Run server-side embed → traced output + signed download URL.
-      // Pass sourcePath directly — avoids server-side path reconstruction mismatch.
-      setStage('embedding')
-      const embedRes = await fetch('/api/trace/embed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          uploadId: signData.uploadId,
-          sourcePath: signData.sourcePath,
-          recipientLabel: recipient.trim(),
-          sourceExt: extFromName(file.name),
-        }),
-      })
-      const embedData = (await embedRes.json().catch(() => ({}))) as
-        | EmbedResponse
-        | { error?: string }
-      if (!embedRes.ok || !('ok' in embedData)) {
-        const msg = (embedData as { error?: string }).error || `Embed failed (${embedRes.status})`
-        throw new Error(msg)
-      }
-
-      setProgress(100)
+      setDownloadUrl(url)
+      setDownloadName(fname)
+      setPayloadId(pid)
       setStage('done')
-      setResult(embedData)
+
+      // Auto-trigger browser download
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fname
+      a.click()
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : 'Trace failed')
       setStage('error')
     }
-  }, [file, recipient, userId])
+  }, [file, recipient])
 
   const reset = () => {
+    if (downloadUrl?.startsWith('blob:')) URL.revokeObjectURL(downloadUrl)
     setFile(null)
     setRecipient('')
     setStage('idle')
     setErrorMsg(null)
-    setResult(null)
-    setProgress(0)
+    setDownloadUrl(null)
+    setPayloadId(null)
     if (inputRef.current) inputRef.current.value = ''
   }
 
   if (!authReady) {
     return (
-      <main className="flex min-h-[100dvh] items-center justify-center px-6 text-sm text-[var(--muted-foreground)]">
+      <main className="flex min-h-[100dvh] items-center justify-center text-sm" style={{ color: 'var(--muted-foreground)' }}>
         Loading…
       </main>
     )
@@ -183,19 +134,19 @@ export function TracePageClient() {
 
   if (!userId) {
     return (
-      <main className="flex min-h-[100dvh] items-center justify-center bg-[var(--background)] px-6 text-[var(--foreground)]">
+      <main className="flex min-h-[100dvh] items-center justify-center px-6" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
         <div className="max-w-md text-center">
-          <p className="font-mono-ui mb-4 text-[10px] uppercase tracking-[0.32em] text-[var(--primary)]">
+          <p className="font-mono-ui mb-4 text-[10px] uppercase tracking-[0.32em]" style={{ color: 'var(--primary)' }}>
             Markit · Trace
           </p>
           <h1 className="font-serif-display mb-3 text-3xl">Sign in to forensic-trace</h1>
-          <p className="mb-6 text-sm text-[var(--muted-foreground)]">
-            Drop a video, type a recipient name, download a uniquely marked copy. Each copy is
-            traceable back to the recipient if it leaks.
+          <p className="mb-6 text-sm" style={{ color: 'var(--muted-foreground)' }}>
+            Drop a video, enter a recipient, download a uniquely marked copy.
           </p>
           <Link
             href="/auth/sign-in?next=/trace"
-            className="inline-block rounded-full bg-[var(--primary)] px-6 py-3 text-sm font-semibold text-[var(--primary-foreground)]"
+            className="inline-block rounded-full px-6 py-3 text-sm font-semibold"
+            style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
           >
             Sign in
           </Link>
@@ -204,7 +155,8 @@ export function TracePageClient() {
     )
   }
 
-  const busy = stage === 'preparing' || stage === 'uploading' || stage === 'embedding'
+  const busy = stage === 'tracing'
+  const canTrace = !!file && !!recipient.trim() && !busy
 
   return (
     <div className="markit-shell flex min-h-dvh flex-col" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
@@ -214,162 +166,189 @@ export function TracePageClient() {
           <span style={{ fontFamily: 'var(--font-cinzel), serif', fontSize: 15, fontStyle: 'italic', color: 'var(--accent)' }}>Trace</span>
         </div>
         <div className="mk-h-right">
+          <Link href="/detect" className="mk-btn">Detect →</Link>
           <Link href="/editor" className="mk-btn">← Editor</Link>
         </div>
       </header>
+
       <main className="flex-1 px-6 py-12">
-      <div className="mx-auto max-w-2xl">
-        <div className="mb-8">
-          <h1 className="font-serif-display text-4xl">Forensic-trace a video</h1>
-          <p className="mt-2 text-sm text-[var(--muted-foreground)]">
-            Drop a video, type a recipient, download a uniquely marked copy. If the file leaks,{' '}
-            <Link href="/detect" className="underline">drop it in /detect</Link> to see who.
-          </p>
-        </div>
+        <div className="mx-auto max-w-2xl space-y-8">
 
-        <div
-          ref={dropRef}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={onDrop}
-          className="mb-4 rounded-xl border-2 border-dashed p-8 text-center transition-colors"
-          style={{
-            borderColor: file ? 'var(--primary)' : 'var(--border)',
-            background: file ? 'color-mix(in oklch, var(--primary) 6%, transparent)' : 'transparent',
-          }}
-        >
-          {file ? (
-            <div>
-              <p className="font-medium">{file.name}</p>
-              <p className="mt-1 text-xs text-[var(--muted-foreground)]">
-                {fmtBytes(file.size)} · {file.type || 'video/mp4'}
-              </p>
-              <button
-                type="button"
-                onClick={() => handleSelectFile(null)}
-                disabled={busy}
-                className="mt-3 rounded-md border px-3 py-1 text-xs disabled:opacity-40"
-                style={{ borderColor: 'var(--border)' }}
-              >
-                Choose a different file
-              </button>
-            </div>
-          ) : (
-            <div>
-              <p className="text-sm">Drop a video here</p>
-              <p className="mt-1 text-xs text-[var(--muted-foreground)]">
-                or click to browse — mp4, mov, webm, mkv (≤ 1 GB)
-              </p>
-              <input
-                ref={inputRef}
-                type="file"
-                accept={ACCEPTED_MIME}
-                onChange={(e) => handleSelectFile(e.target.files?.[0] ?? null)}
-                className="mt-4 cursor-pointer text-xs"
-                disabled={busy}
-              />
-            </div>
-          )}
-        </div>
+          {/* Title */}
+          <div>
+            <h1 className="font-serif-display text-4xl">Forensic-trace a video</h1>
+            <p className="mt-2 text-sm" style={{ color: 'var(--muted-foreground)' }}>
+              Embed a unique marker tied to a recipient. If the file leaks,{' '}
+              <Link href="/detect" className="underline">drop it in /detect</Link> to identify who.
+            </p>
+          </div>
 
-        <label className="mb-4 block">
-          <span className="text-xs text-[var(--muted-foreground)]">Recipient</span>
-          <input
-            value={recipient}
-            onChange={(e) => setRecipient(e.target.value)}
-            disabled={busy}
-            placeholder="e.g. alice_test or fan-handle"
-            maxLength={500}
-            className="mt-1 w-full rounded-lg border bg-black/20 px-3 py-2 text-sm outline-none disabled:opacity-40"
-            style={{ borderColor: 'var(--border)' }}
-          />
-        </label>
-
-        <p className="mb-5 rounded-md border border-[var(--border)] bg-black/20 px-3 py-2 text-[11px] leading-snug text-[var(--muted-foreground)]">
-          <span className="font-mono-ui uppercase tracking-[0.18em] text-[var(--circe-light)]">v1 trace —</span>{' '}
-          Append marker embedded after EOF. Survives direct file shares and most platform re-uploads.
-          Does <strong>not</strong> survive re-encoding or screenshots.{' '}
-          <span style={{ color: 'var(--primary)' }}>v2 frame watermark</span> (survives re-encoding &amp; screenshots) is available via the editor export flow.
-        </p>
-
-        <button
-          type="button"
-          onClick={() => void onSign()}
-          disabled={!file || !recipient.trim() || busy}
-          className="w-full rounded-lg px-4 py-3 text-sm font-semibold text-[var(--primary-foreground)] disabled:opacity-40"
-          style={{ background: 'var(--primary)' }}
-        >
-          {stage === 'preparing'
-            ? 'Preparing…'
-            : stage === 'uploading'
-              ? 'Uploading…'
-              : stage === 'embedding'
-                ? 'Embedding marker…'
-                : stage === 'done'
-                  ? 'Traced — see download below'
-                  : 'Sign & Download'}
-        </button>
-
-        {busy ? (
-          <div className="mt-3 h-1 w-full overflow-hidden rounded bg-[var(--border-soft)]">
-            <div
-              className="h-full transition-all"
-              style={{ width: `${progress}%`, background: 'var(--primary)' }}
+          {/* Drop zone */}
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={onDrop}
+            className="rounded-xl border-2 border-dashed p-8 text-center transition-colors cursor-pointer"
+            style={{
+              borderColor: file ? 'var(--primary)' : 'var(--border)',
+              background: file ? 'color-mix(in oklch, var(--primary) 6%, transparent)' : 'transparent',
+            }}
+            onClick={() => inputRef.current?.click()}
+          >
+            {file ? (
+              <div>
+                <p className="font-medium">{file.name}</p>
+                <p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                  {fmtBytes(file.size)} · {file.type || 'video'}
+                </p>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); handleSelectFile(null) }}
+                  disabled={busy}
+                  className="mt-3 rounded-md border px-3 py-1 text-xs disabled:opacity-40"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  Choose a different file
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div className="text-3xl mb-2">📹</div>
+                <p className="text-sm font-medium">Drop a video here or click to browse</p>
+                <p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                  MP4, MOV, WebM, MKV — up to 1 GB
+                </p>
+              </div>
+            )}
+            <input
+              ref={inputRef}
+              type="file"
+              accept={ACCEPTED_MIME}
+              onChange={(e) => handleSelectFile(e.target.files?.[0] ?? null)}
+              className="hidden"
+              disabled={busy}
             />
           </div>
-        ) : null}
 
-        {errorMsg ? (
-          <p className="mt-4 rounded-md border border-[var(--destructive)] bg-black/20 px-3 py-2 text-xs text-[var(--destructive)]">
-            {errorMsg}
-          </p>
-        ) : null}
+          {/* Recipient */}
+          <label className="block">
+            <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Recipient label</span>
+            <input
+              value={recipient}
+              onChange={(e) => setRecipient(e.target.value)}
+              disabled={busy}
+              placeholder="e.g. alice_test or @fanhandle"
+              maxLength={500}
+              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none disabled:opacity-40"
+              style={{ borderColor: 'var(--border)', background: 'transparent' }}
+            />
+          </label>
 
-        {result ? (
-          <div className="mt-6 rounded-xl border p-4" style={{ borderColor: 'var(--border)' }}>
-            <p className="mb-3 text-sm">
-              <span className="font-mono-ui mr-2 text-[10px] uppercase tracking-[0.18em] text-[var(--primary)]">
-                Traced
-              </span>
-              for <span className="font-semibold">{result.recipientLabel}</span>
-              <span className="ml-2 font-mono-ui text-[10px] text-[var(--muted-foreground)]">
-                · payload {result.payloadId.slice(0, 8)}
-              </span>
+          {/* Error */}
+          {errorMsg && (
+            <p className="rounded-md border px-3 py-2 text-xs" style={{ borderColor: 'var(--destructive)', color: 'var(--destructive)' }}>
+              {errorMsg}
             </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <a
-                href={result.downloadUrl}
-                download={result.downloadFilename}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-md px-4 py-2 text-xs font-semibold text-[var(--primary-foreground)]"
-                style={{ background: 'var(--primary)' }}
-              >
-                Download traced copy
-              </a>
-              <button
-                type="button"
-                onClick={() => navigator.clipboard?.writeText(result.downloadUrl).catch(() => {})}
-                className="rounded-md border px-3 py-2 text-xs"
-                style={{ borderColor: 'var(--border)' }}
-              >
-                Copy link
-              </button>
-              <button
-                type="button"
-                onClick={reset}
-                className="rounded-md border px-3 py-2 text-xs"
-                style={{ borderColor: 'var(--border)' }}
-              >
-                Trace another
-              </button>
+          )}
+
+          {/* Action cards */}
+          {stage !== 'done' && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+
+              {/* Option 1 — Download to PC */}
+              <div className="rounded-xl border p-5 space-y-3 flex flex-col" style={{ borderColor: 'var(--border)', background: 'var(--card)' }}>
+                <div>
+                  <p className="font-semibold text-sm">⬇️ Download to PC</p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                    v1 append marker embedded locally. Instant download — no Creatix, no cloud storage.
+                    Survives direct shares &amp; most re-uploads.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void onTraceDownload()}
+                  disabled={!canTrace}
+                  className="mt-auto w-full rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-40 transition-opacity"
+                  style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                >
+                  {busy ? 'Embedding marker…' : 'Trace & Download'}
+                </button>
+              </div>
+
+              {/* Option 2 — Creatix v2 (coming soon) */}
+              <div className="rounded-xl border p-5 space-y-3 flex flex-col opacity-50" style={{ borderColor: 'var(--border)', background: 'var(--card)' }}>
+                <div>
+                  <p className="font-semibold text-sm">🔬 Creatix frame watermark</p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                    v2 frame-level embed via Creatix. Survives re-encoding &amp; screenshots.
+                    Will be connected once Creatix integration is live.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled
+                  className="mt-auto w-full rounded-lg px-4 py-2.5 text-sm font-semibold opacity-40 cursor-not-allowed"
+                  style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}
+                >
+                  Coming soon
+                </button>
+              </div>
             </div>
-            <p className="mt-3 text-[10px] text-[var(--muted-foreground)]">
-              Signed link expires {new Date(result.expiresAt).toLocaleString()}. Algorithm:{' '}
-              {result.algorithmVersion}.
+          )}
+
+          {/* Done state */}
+          {stage === 'done' && downloadUrl && (
+            <div className="rounded-xl border p-5 space-y-4" style={{ borderColor: 'var(--primary)', background: 'color-mix(in oklch, var(--primary) 6%, transparent)' }}>
+              <p className="font-semibold text-sm" style={{ color: 'var(--primary)' }}>✓ Traced successfully</p>
+              <p className="text-sm">
+                Recipient: <span className="font-semibold">{recipient}</span>
+                {payloadId && (
+                  <span className="ml-2 font-mono-ui text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                    · payload {payloadId.slice(0, 8)}
+                  </span>
+                )}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <a
+                  href={downloadUrl}
+                  download={downloadName}
+                  className="rounded-lg px-4 py-2 text-sm font-semibold"
+                  style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                >
+                  Download again
+                </a>
+                <Link
+                  href="/detect"
+                  className="rounded-lg border px-4 py-2 text-sm"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  Test in /detect →
+                </Link>
+                <button
+                  type="button"
+                  onClick={reset}
+                  className="rounded-lg border px-4 py-2 text-sm"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  Trace another
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Caveat */}
+          <div className="rounded-lg p-4 space-y-1.5" style={{ background: 'var(--card-2)', border: '1px solid var(--border-soft)' }}>
+            <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+              <span className="font-semibold" style={{ color: 'var(--foreground)' }}>v1 (download to PC):</span>{' '}
+              Append marker after video EOF. Works for testing detect flows — drop the downloaded file or a screenshot into{' '}
+              <Link href="/detect" className="underline">/detect</Link>.
+            </p>
+            <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+              <span className="font-semibold" style={{ color: 'var(--primary)' }}>v2 (coming soon):</span>{' '}
+              Frame watermark via Creatix — survives re-encoding &amp; screenshots.
             </p>
           </div>
-        ) : null}
-      </div>
+
+        </div>
       </main>
     </div>
   )
