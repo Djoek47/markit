@@ -10,11 +10,14 @@
  *          Does NOT survive re-encoding or screenshots.
  */
 
-type SignUploadResponse = {
+type TraceSignUploadResponse = {
   ok: boolean
-  mediaId: string
+  uploadId: string
   uploadUrl: string
-  uploadHeaders: Record<string, string>
+  uploadToken: string
+  sourcePath: string
+  bucket: string
+  expiresAt: string
 }
 
 type EmbedResponse = {
@@ -25,43 +28,37 @@ type EmbedResponse = {
   algorithmVersion?: string
 }
 
-// ─── Shared: upload the blob to storage ───────────────────────────────────────
+// ─── Shared: upload the blob to trace storage ─────────────────────────────────
+// Uses /api/trace/sign-upload → markit-trace-uploads bucket.
+// (NOT /api/media/sign-upload → markit-uploads, which is the media library pipeline.)
 
-async function uploadBlobToStorage(renderedBlob: Blob): Promise<{ mediaId: string }> {
-  const signRes = await fetch('/api/media/sign-upload', {
+async function uploadBlobToTraceStorage(
+  renderedBlob: Blob,
+): Promise<{ uploadId: string; sourcePath: string }> {
+  const signRes = await fetch('/api/trace/sign-upload', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      kind: 'video',
+      filename: 'openreel-export.mp4',
       sizeBytes: renderedBlob.size,
       contentType: 'video/mp4',
-      filenameHint: 'openreel-export.mp4',
     }),
   })
   if (!signRes.ok) {
     const err = (await signRes.json().catch(() => ({}))) as { error?: string }
-    throw new Error(err.error ?? `sign-upload failed (${signRes.status})`)
+    throw new Error(err.error ?? `trace sign-upload failed (${signRes.status})`)
   }
-  const sign = (await signRes.json()) as SignUploadResponse
+  const sign = (await signRes.json()) as TraceSignUploadResponse
 
+  // Upload directly to Supabase Storage via the signed URL
   const putRes = await fetch(sign.uploadUrl, {
     method: 'PUT',
-    headers: { 'Content-Type': 'video/mp4', ...sign.uploadHeaders },
+    headers: { 'Content-Type': 'video/mp4' },
     body: renderedBlob,
   })
   if (!putRes.ok) throw new Error(`Storage PUT failed (${putRes.status})`)
 
-  const finalizeRes = await fetch('/api/media/finalize', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mediaId: sign.mediaId }),
-  })
-  if (!finalizeRes.ok) {
-    const err = (await finalizeRes.json().catch(() => ({}))) as { error?: string }
-    throw new Error(err.error ?? `finalize failed (${finalizeRes.status})`)
-  }
-
-  return { mediaId: sign.mediaId }
+  return { uploadId: sign.uploadId, sourcePath: sign.sourcePath }
 }
 
 // ─── v1: append-v1 (post-EOF bytes) ──────────────────────────────────────────
@@ -70,19 +67,18 @@ async function runMarkitTraceFlowV1(
   renderedBlob: Blob,
   recipientLabel: string,
 ): Promise<{ downloadUrl: string; payloadId: string; algorithmVersion: string }> {
-  const { mediaId } = await uploadBlobToStorage(renderedBlob)
+  const { uploadId, sourcePath } = await uploadBlobToTraceStorage(renderedBlob)
 
   const embedRes = await fetch('/api/trace/embed', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ uploadId: mediaId, recipientLabel }),
+    body: JSON.stringify({ uploadId, sourcePath, recipientLabel, sourceExt: 'mp4' }),
   })
   if (!embedRes.ok) {
     const err = (await embedRes.json().catch(() => ({}))) as { error?: string }
     throw new Error(err.error ?? `trace/embed failed (${embedRes.status})`)
   }
   const embed = (await embedRes.json()) as EmbedResponse
-
   return { downloadUrl: embed.downloadUrl, payloadId: embed.payloadId, algorithmVersion: 'append-v1' }
 }
 
@@ -92,12 +88,12 @@ async function runMarkitTraceFlowV2(
   renderedBlob: Blob,
   recipientLabel: string,
 ): Promise<{ downloadUrl: string; payloadId: string; algorithmVersion: string }> {
-  const { mediaId } = await uploadBlobToStorage(renderedBlob)
+  const { uploadId, sourcePath } = await uploadBlobToTraceStorage(renderedBlob)
 
   const embedRes = await fetch('/api/trace/embed-v2', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ uploadId: mediaId, recipientLabel }),
+    body: JSON.stringify({ uploadId, sourcePath, recipientLabel, sourceExt: 'mp4' }),
   })
 
   // If Creatix v2 service not yet deployed, fall back to v1 gracefully
@@ -106,7 +102,7 @@ async function runMarkitTraceFlowV2(
     const fallbackRes = await fetch('/api/trace/embed', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uploadId: mediaId, recipientLabel }),
+      body: JSON.stringify({ uploadId, sourcePath, recipientLabel, sourceExt: 'mp4' }),
     })
     if (!fallbackRes.ok) {
       const err = (await fallbackRes.json().catch(() => ({}))) as { error?: string }
@@ -121,7 +117,6 @@ async function runMarkitTraceFlowV2(
     throw new Error(err.error ?? `trace/embed-v2 failed (${embedRes.status})`)
   }
   const embed = (await embedRes.json()) as EmbedResponse
-
   return {
     downloadUrl: embed.downloadUrl,
     payloadId: embed.payloadId,

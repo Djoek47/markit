@@ -9,12 +9,18 @@ const ok = (body: unknown) =>
 const err = (status: number, body: unknown) =>
   ({ ok: false, status, json: () => Promise.resolve(body) }) as unknown as Response
 
-// Helper: mock the common upload sequence (sign → PUT → finalize)
-function mockUpload(mediaId = 'mid-1') {
+// New upload helper: sign → PUT (2 calls, no finalize)
+function mockUpload(uploadId = 'uid-1', sourcePath = 'user-1/uid-1.mp4') {
   mockFetch
-    .mockResolvedValueOnce(ok({ ok: true, mediaId, uploadUrl: 'https://storage/put', uploadHeaders: { 'x-custom': 'val' } }))
+    .mockResolvedValueOnce(ok({
+      ok: true,
+      uploadId,
+      uploadUrl: 'https://storage/put',
+      uploadToken: 'tok',
+      sourcePath,
+      bucket: 'markit-trace-uploads',
+    }))
     .mockResolvedValueOnce({ ok: true, status: 200 } as Response)
-    .mockResolvedValueOnce(ok({ ok: true, mediaId }))
 }
 
 const blob = new Blob(['fake-video'], { type: 'video/mp4' })
@@ -22,10 +28,10 @@ const recipient = 'alice'
 
 beforeEach(() => vi.clearAllMocks())
 
-// ─── v2 path (default — embed-v2 called first) ────────────────────────────────
+// ─── v2 path (default) ────────────────────────────────────────────────────────
 
 describe('runMarkitTraceFlow — v2 path', () => {
-  it('calls sign-upload → PUT → finalize → embed-v2 in order', async () => {
+  it('calls trace/sign-upload → PUT → embed-v2 in order', async () => {
     mockUpload()
     mockFetch.mockResolvedValueOnce(ok({ ok: true, payloadId: 'pid-v2', downloadUrl: 'https://cdn/v2.mp4', algorithmVersion: 'frame-v2' }))
 
@@ -35,27 +41,24 @@ describe('runMarkitTraceFlow — v2 path', () => {
     expect(result.downloadUrl).toBe('https://cdn/v2.mp4')
     expect(result.algorithmVersion).toBe('frame-v2')
 
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/media/sign-upload')
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/trace/sign-upload')
     expect(mockFetch.mock.calls[1][0]).toBe('https://storage/put')
-    expect(mockFetch.mock.calls[2][0]).toBe('/api/media/finalize')
-    expect(mockFetch.mock.calls[3][0]).toBe('/api/trace/embed-v2')
-
-    const embedBody = JSON.parse(mockFetch.mock.calls[3][1].body as string) as Record<string, unknown>
-    expect(embedBody.uploadId).toBe('mid-1')
-    expect(embedBody.recipientLabel).toBe(recipient)
+    expect(mockFetch.mock.calls[2][0]).toBe('/api/trace/embed-v2')
   })
 
-  it('uses the mediaId from sign-upload in embed-v2 body', async () => {
-    mockUpload('unique-id-xyz')
+  it('passes uploadId and sourcePath to embed-v2', async () => {
+    mockUpload('unique-uid', 'user-1/unique-uid.mp4')
     mockFetch.mockResolvedValueOnce(ok({ ok: true, payloadId: 'p1', downloadUrl: 'https://cdn/p1.mp4' }))
 
     await runMarkitTraceFlow(blob, recipient)
 
-    const embedBody = JSON.parse(mockFetch.mock.calls[3][1].body as string) as Record<string, unknown>
-    expect(embedBody.uploadId).toBe('unique-id-xyz')
+    const embedBody = JSON.parse(mockFetch.mock.calls[2][1].body as string) as Record<string, unknown>
+    expect(embedBody.uploadId).toBe('unique-uid')
+    expect(embedBody.sourcePath).toBe('user-1/unique-uid.mp4')
+    expect(embedBody.recipientLabel).toBe(recipient)
   })
 
-  it('sends blob size in sign-upload body', async () => {
+  it('sends blob size and filename in sign-upload body', async () => {
     const bigBlob = new Blob(['x'.repeat(1024)], { type: 'video/mp4' })
     mockUpload()
     mockFetch.mockResolvedValueOnce(ok({ ok: true, payloadId: 'p1', downloadUrl: 'https://cdn/p1.mp4' }))
@@ -64,21 +67,7 @@ describe('runMarkitTraceFlow — v2 path', () => {
 
     const signBody = JSON.parse(mockFetch.mock.calls[0][1].body as string) as Record<string, unknown>
     expect(signBody.sizeBytes).toBe(1024)
-  })
-
-  it('forwards uploadHeaders to the PUT request', async () => {
-    mockFetch
-      .mockResolvedValueOnce(ok({ ok: true, mediaId: 'mid-1', uploadUrl: 'https://storage/put', uploadHeaders: { 'x-amz-acl': 'private', 'x-custom': 'abc' } }))
-      .mockResolvedValueOnce({ ok: true, status: 200 } as Response)
-      .mockResolvedValueOnce(ok({ ok: true }))
-      .mockResolvedValueOnce(ok({ ok: true, payloadId: 'p1', downloadUrl: 'https://cdn/p1.mp4' }))
-
-    await runMarkitTraceFlow(blob, recipient)
-
-    const putHeaders = mockFetch.mock.calls[1][1].headers as Record<string, string>
-    expect(putHeaders['x-amz-acl']).toBe('private')
-    expect(putHeaders['x-custom']).toBe('abc')
-    expect(putHeaders['Content-Type']).toBe('video/mp4')
+    expect(signBody.filename).toBe('openreel-export.mp4')
   })
 })
 
@@ -125,24 +114,16 @@ describe('runMarkitTraceFlow — v2 fallback to v1', () => {
 // ─── error paths ──────────────────────────────────────────────────────────────
 
 describe('runMarkitTraceFlow — error paths', () => {
-  it('throws if sign-upload fails', async () => {
+  it('throws if sign-upload fails with error body', async () => {
     mockFetch.mockResolvedValueOnce(err(403, { error: 'Feature disabled' }))
     await expect(runMarkitTraceFlow(blob, recipient)).rejects.toThrow('Feature disabled')
   })
 
   it('throws if storage PUT fails', async () => {
     mockFetch
-      .mockResolvedValueOnce(ok({ ok: true, mediaId: 'mid-1', uploadUrl: 'https://storage/put', uploadHeaders: {} }))
+      .mockResolvedValueOnce(ok({ ok: true, uploadId: 'uid-1', uploadUrl: 'https://storage/put', uploadToken: 'tok', sourcePath: 'u/uid-1.mp4', bucket: 'markit-trace-uploads' }))
       .mockResolvedValueOnce({ ok: false, status: 503 } as Response)
     await expect(runMarkitTraceFlow(blob, recipient)).rejects.toThrow('Storage PUT failed (503)')
-  })
-
-  it('throws if finalize fails', async () => {
-    mockFetch
-      .mockResolvedValueOnce(ok({ ok: true, mediaId: 'mid-1', uploadUrl: 'https://storage/put', uploadHeaders: {} }))
-      .mockResolvedValueOnce({ ok: true, status: 200 } as Response)
-      .mockResolvedValueOnce(err(400, { error: 'Bad mediaId' }))
-    await expect(runMarkitTraceFlow(blob, recipient)).rejects.toThrow('Bad mediaId')
   })
 
   it('throws if embed-v2 returns 502 (no fallback for upstream errors)', async () => {
@@ -153,6 +134,6 @@ describe('runMarkitTraceFlow — error paths', () => {
 
   it('falls through with generic message when sign-upload has no body', async () => {
     mockFetch.mockResolvedValueOnce({ ok: false, status: 503, json: () => Promise.reject(new Error('no body')) } as unknown as Response)
-    await expect(runMarkitTraceFlow(blob, recipient)).rejects.toThrow('sign-upload failed (503)')
+    await expect(runMarkitTraceFlow(blob, recipient)).rejects.toThrow('trace sign-upload failed (503)')
   })
 })
