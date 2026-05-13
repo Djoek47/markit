@@ -78,7 +78,6 @@ export async function POST(req: NextRequest) {
       const imageBuffer = Buffer.from(await file.arrayBuffer())
       const result = await detectV2FromImage(imageBuffer)
 
-      // Map to a verdict shape consistent with what the UI expects
       if (result.match_state === 'none' || !result.payload_candidates.length) {
         return NextResponse.json({
           ok: true,
@@ -88,13 +87,45 @@ export async function POST(req: NextRequest) {
       }
 
       const best = result.payload_candidates[0]!
+
+      // If we decoded a full UUID, try to resolve it to a recipient in trace_exports
+      if (best.source === 'watermark_v2_uuid') {
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+        const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+        if (url && serviceKey) {
+          const service = createServiceClient(url, serviceKey)
+          const { data: row } = await service
+            .schema('markit')
+            .from('trace_exports')
+            .select('recipient_label, algorithm, created_at')
+            .eq('payload_id', best.payload_id)
+            .eq('user_id', user.id)
+            .maybeSingle()
+
+          if (row) {
+            const verdict = {
+              kind: 'identified' as const,
+              recipientLabel: row.recipient_label as string,
+              payloadIdShort: best.payload_id.slice(0, 8),
+              algorithmVersion: (row.algorithm as string) ?? 'frame-v2',
+            }
+            return NextResponse.json({
+              ok: true,
+              verdict,
+              line: `Traced to ${row.recipient_label} (frame watermark, ${(best.confidence * 100).toFixed(1)}% confidence)`,
+            })
+          }
+        }
+      }
+
+      // Watermark found but not in this user's records (or hash-only payload)
       const verdict = {
         kind: 'v2_candidate' as const,
         payload_id: best.payload_id,
         confidence: best.confidence,
         source: best.source,
       }
-      const line = `Ariadne v2 watermark detected (confidence ${(best.confidence * 100).toFixed(1)}%). Payload: ${best.payload_id}`
+      const line = `Ariadne v2 watermark detected (${(best.confidence * 100).toFixed(1)}% confidence) — payload not in your trace records.`
       return NextResponse.json({ ok: true, verdict, line, detect_v2: result })
     } catch (e) {
       console.error('[trace/detect] image path error:', (e as Error).message)

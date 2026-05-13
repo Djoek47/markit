@@ -157,7 +157,7 @@ export function DetectPageClient() {
         <div className="space-y-3 text-center">
           <h1 className="font-serif-display text-4xl">Verify a Leak</h1>
           <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
-            Drop a video. We extract its marker and tell you who it was sent to.
+            Drop a video or screenshot. We extract its marker and tell you who it was sent to.
           </p>
         </div>
 
@@ -231,21 +231,19 @@ export function DetectPageClient() {
           ) : result.verdict.kind === 'v2_candidate' ? (
             <>
               <p className="text-sm font-medium" style={{ color: 'var(--muted-foreground)' }}>
-                v2 Watermark Detected
+                v2 Watermark Detected — Not in Your Records
               </p>
               <div className="flex flex-wrap items-center gap-3">
-                <div className="rounded-full px-4 py-2 text-sm font-semibold" style={{ backgroundColor: 'var(--primary)', color: '#000' }}>
+                <div className="rounded-full px-4 py-2 text-sm font-semibold" style={{ backgroundColor: 'color-mix(in oklch, var(--primary) 40%, transparent)', color: 'var(--foreground)' }}>
                   {(result.verdict.confidence * 100).toFixed(1)}% confidence
                 </div>
                 <div className="font-mono-ui text-xs" style={{ color: 'var(--muted-foreground)' }}>
                   Payload: {result.verdict.payload_id.slice(0, 16)}…
                 </div>
-                <div className="font-mono-ui text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                  Source: {result.verdict.source}
-                </div>
               </div>
               <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                Frame watermark found. Match this payload ID against your trace records to identify the recipient.
+                Frame watermark found but this payload isn&apos;t in your trace records.
+                It may belong to a different account or was traced outside Markit.
               </p>
             </>
           ) : (
