@@ -284,7 +284,8 @@ function CreatixBridge() {
   }
 
   return (
-    <div className="pointer-events-none fixed right-4 top-[4.75rem] z-[80] flex max-w-[23rem] flex-col items-end gap-2">
+    <div className="pointer-events-none fixed right-4 top-[4.75rem] z-[80] flex max-w-xs flex-col items-end gap-2">
+      {/* Status pill */}
       <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-white/10 bg-black/70 px-3 py-2 text-xs text-white shadow-2xl backdrop-blur-xl">
         {status === 'importing' || status === 'saving' ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" aria-hidden />
@@ -293,7 +294,7 @@ function CreatixBridge() {
         ) : (
           <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_14px_var(--primary)]" aria-hidden />
         )}
-        <span className="max-w-[12rem] truncate text-white/82">{message}</span>
+        <span className="max-w-[10rem] truncate text-white/82">{message}</span>
         {bridge.exportUrl ? (
           <button
             type="button"
@@ -306,8 +307,41 @@ function CreatixBridge() {
           </button>
         ) : null}
       </div>
+
+      {/* Ariadne trace panel — shown when ready */}
+      {canSave ? (
+        <div className="pointer-events-auto w-full rounded-2xl border border-white/10 bg-black/75 p-3 shadow-2xl backdrop-blur-xl">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-primary">
+            ✦ Ariadne Trace
+          </p>
+          <p className="mb-2 text-[10px] text-white/50">
+            Enter a recipient label to embed a forensic trace on export.
+            Leave blank to skip.
+          </p>
+          <input
+            type="text"
+            value={traceRecipient ?? ''}
+            onChange={(e) => setTraceRecipient(e.target.value.trim() || null)}
+            placeholder="e.g. alice_test"
+            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white placeholder-white/30 outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+          />
+          {traceRecipient ? (
+            <p className="mt-1.5 text-[10px] text-primary">
+              Will trace to: <strong>{traceRecipient}</strong>
+            </p>
+          ) : (
+            <p className="mt-1.5 text-[10px] text-white/30">No trace — export without marker</p>
+          )}
+          <p className="mt-2 text-[9px] leading-relaxed text-white/30">
+            v1 trace survives direct file shares and most platform re-uploads.
+            Does not survive re-encoding or screenshots.
+          </p>
+        </div>
+      ) : null}
+
+      {/* Export progress bar */}
       {status === 'saving' ? (
-        <div className="h-1 w-56 overflow-hidden rounded-full bg-white/10">
+        <div className="h-1 w-full overflow-hidden rounded-full bg-white/10">
           <div className="h-full bg-primary transition-[width]" style={{ width: `${Math.max(4, progress)}%` }} />
         </div>
       ) : null}
