@@ -6,7 +6,8 @@ import { createClient } from '@/lib/supabase/client'
 
 type Stage = 'idle' | 'tracing' | 'done' | 'error'
 
-const ACCEPTED_MIME = 'video/mp4,video/quicktime,video/webm,video/x-matroska'
+const ACCEPTED_MIME = 'video/mp4,video/quicktime,video/webm,video/x-matroska,image/jpeg,image/png,image/webp'
+const IMAGE_MIMES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 const MAX_BYTES = 1024 * 1024 * 1024
 
 function fmtBytes(n: number): string {
@@ -22,6 +23,7 @@ export function TracePageClient() {
   const [file, setFile] = useState<File | null>(null)
   const [recipient, setRecipient] = useState('')
   const [stage, setStage] = useState<Stage>('idle')
+  const [activeMethod, setActiveMethod] = useState<'v1' | 'v2' | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
   const [downloadName, setDownloadName] = useState<string>('traced.mp4')
@@ -47,11 +49,14 @@ export function TracePageClient() {
     }
   }, [downloadUrl])
 
+  const isImage = file ? IMAGE_MIMES.has(file.type) : false
+
   const handleSelectFile = (next: File | null) => {
     setErrorMsg(null)
     setDownloadUrl(null)
     setPayloadId(null)
     setStage('idle')
+    setActiveMethod(null)
     if (!next) { setFile(null); return }
     if (next.size > MAX_BYTES) {
       setErrorMsg(`File too large (${fmtBytes(next.size)} > 1 GB)`)
@@ -66,12 +71,12 @@ export function TracePageClient() {
     if (dropped) handleSelectFile(dropped)
   }, [])
 
-  /** Download to PC — v1 append marker, no Creatix, no intermediate storage */
-  const onTraceDownload = useCallback(async () => {
+  const runTrace = useCallback(async (endpoint: string, method: 'v1' | 'v2') => {
     if (!file || !recipient.trim()) return
     setErrorMsg(null)
     setDownloadUrl(null)
     setPayloadId(null)
+    setActiveMethod(method)
     setStage('tracing')
 
     try {
@@ -79,11 +84,7 @@ export function TracePageClient() {
       form.append('file', file)
       form.append('recipientLabel', recipient.trim())
 
-      const res = await fetch('/api/trace/embed-direct', {
-        method: 'POST',
-        credentials: 'include',
-        body: form,
-      })
+      const res = await fetch(endpoint, { method: 'POST', credentials: 'include', body: form })
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({})) as { error?: string }
@@ -95,14 +96,13 @@ export function TracePageClient() {
       const pid = res.headers.get('X-Payload-Id') ?? ''
       const fname =
         res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1]
-        ?? `traced_${Date.now()}.mp4`
+        ?? `traced_${Date.now()}.${method === 'v2' ? 'png' : 'mp4'}`
 
       setDownloadUrl(url)
       setDownloadName(fname)
       setPayloadId(pid)
       setStage('done')
 
-      // Auto-trigger browser download
       const a = document.createElement('a')
       a.href = url
       a.download = fname
@@ -110,6 +110,7 @@ export function TracePageClient() {
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : 'Trace failed')
       setStage('error')
+      setActiveMethod(null)
     }
   }, [file, recipient])
 
@@ -118,6 +119,7 @@ export function TracePageClient() {
     setFile(null)
     setRecipient('')
     setStage('idle')
+    setActiveMethod(null)
     setErrorMsg(null)
     setDownloadUrl(null)
     setPayloadId(null)
@@ -213,9 +215,9 @@ export function TracePageClient() {
             ) : (
               <div>
                 <div className="text-3xl mb-2">📹</div>
-                <p className="text-sm font-medium">Drop a video here or click to browse</p>
+                <p className="text-sm font-medium">Drop a file here or click to browse</p>
                 <p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                  MP4, MOV, WebM, MKV — up to 1 GB
+                  Video: MP4, MOV, WebM, MKV (v1) · Image: PNG, JPEG, WebP (v1 &amp; v2)
                 </p>
               </div>
             )}
@@ -254,42 +256,51 @@ export function TracePageClient() {
           {stage !== 'done' && (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 
-              {/* Option 1 — Download to PC */}
+              {/* Option 1 — v1 append marker */}
               <div className="rounded-xl border p-5 space-y-3 flex flex-col" style={{ borderColor: 'var(--border)', background: 'var(--card)' }}>
                 <div>
-                  <p className="font-semibold text-sm">⬇️ Download to PC</p>
+                  <p className="font-semibold text-sm">⬇️ v1 — Download to PC</p>
                   <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
-                    v1 append marker embedded locally. Instant download — no Creatix, no cloud storage.
-                    Survives direct shares &amp; most re-uploads.
+                    Append marker after EOF. Works on video &amp; images.
+                    Survives direct shares &amp; most re-uploads. No Creatix needed.
                   </p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => void onTraceDownload()}
+                  onClick={() => void runTrace('/api/trace/embed-direct', 'v1')}
                   disabled={!canTrace}
                   className="mt-auto w-full rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-40 transition-opacity"
                   style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
                 >
-                  {busy ? 'Embedding marker…' : 'Trace & Download'}
+                  {busy && activeMethod === 'v1' ? 'Embedding…' : 'Trace & Download (v1)'}
                 </button>
               </div>
 
-              {/* Option 2 — Creatix v2 (coming soon) */}
-              <div className="rounded-xl border p-5 space-y-3 flex flex-col opacity-50" style={{ borderColor: 'var(--border)', background: 'var(--card)' }}>
+              {/* Option 2 — v2 frame watermark */}
+              <div
+                className="rounded-xl border p-5 space-y-3 flex flex-col"
+                style={{
+                  borderColor: isImage ? 'var(--primary)' : 'var(--border)',
+                  background: 'var(--card)',
+                  opacity: isImage ? 1 : 0.5,
+                }}
+              >
                 <div>
-                  <p className="font-semibold text-sm">🔬 Creatix frame watermark</p>
+                  <p className="font-semibold text-sm">🔬 v2 — Frame watermark</p>
                   <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
-                    v2 frame-level embed via Creatix. Survives re-encoding &amp; screenshots.
-                    Will be connected once Creatix integration is live.
+                    {isImage
+                      ? 'LSB pixel watermark embedded locally via sharp. Survives screenshots & re-saves. Drop the result into /detect to test the full loop.'
+                      : 'Drop an image (PNG/JPEG/WebP) to use local v2 embed. Video v2 requires Creatix (coming soon).'}
                   </p>
                 </div>
                 <button
                   type="button"
-                  disabled
-                  className="mt-auto w-full rounded-lg px-4 py-2.5 text-sm font-semibold opacity-40 cursor-not-allowed"
-                  style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}
+                  onClick={() => void runTrace('/api/trace/embed-v2-local', 'v2')}
+                  disabled={!canTrace || !isImage}
+                  className="mt-auto w-full rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-40 transition-opacity"
+                  style={{ background: isImage ? 'var(--primary)' : 'var(--muted)', color: isImage ? 'var(--primary-foreground)' : 'var(--muted-foreground)' }}
                 >
-                  Coming soon
+                  {busy && activeMethod === 'v2' ? 'Embedding…' : isImage ? 'Trace & Download (v2)' : 'Image required for v2'}
                 </button>
               </div>
             </div>
@@ -338,13 +349,13 @@ export function TracePageClient() {
           {/* Caveat */}
           <div className="rounded-lg p-4 space-y-1.5" style={{ background: 'var(--card-2)', border: '1px solid var(--border-soft)' }}>
             <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-              <span className="font-semibold" style={{ color: 'var(--foreground)' }}>v1 (download to PC):</span>{' '}
-              Append marker after video EOF. Works for testing detect flows — drop the downloaded file or a screenshot into{' '}
-              <Link href="/detect" className="underline">/detect</Link>.
+              <span className="font-semibold" style={{ color: 'var(--foreground)' }}>v1:</span>{' '}
+              Append marker — works for video &amp; images. Test by dropping into <Link href="/detect" className="underline">/detect</Link>.
             </p>
             <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-              <span className="font-semibold" style={{ color: 'var(--primary)' }}>v2 (coming soon):</span>{' '}
-              Frame watermark via Creatix — survives re-encoding &amp; screenshots.
+              <span className="font-semibold" style={{ color: 'var(--primary)' }}>v2 (images):</span>{' '}
+              LSB frame watermark — drop a PNG/JPEG/WebP, get a watermarked PNG back. Drop it into /detect to verify the full loop.
+              Video v2 requires Creatix (coming soon).
             </p>
           </div>
 

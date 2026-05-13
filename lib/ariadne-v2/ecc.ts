@@ -3,6 +3,25 @@
  * Ported from Creatix lib/ariadne/watermark-engine/ecc.ts — algorithm unchanged.
  */
 
+export function encodeWithParity(bits: number[]): number[] {
+  const encoded: number[] = []
+  for (let i = 0; i < bits.length; i += 4) {
+    const chunk = bits.slice(i, i + 4)
+    while (chunk.length < 4) chunk.push(0)
+    const parity = chunk.reduce((acc, b) => acc ^ (b ? 1 : 0), 0)
+    encoded.push(...chunk, parity)
+  }
+  return encoded
+}
+
+export function repeatBits(bits: number[], factor: number): number[] {
+  const out: number[] = []
+  for (const b of bits) {
+    for (let i = 0; i < Math.max(1, factor); i++) out.push(b ? 1 : 0)
+  }
+  return out
+}
+
 export function decodeWithParity(encoded: number[]): { bits: number[]; parityErrors: number } {
   const out: number[] = []
   let parityErrors = 0
