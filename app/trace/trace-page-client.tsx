@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { watermarkVideoInBrowser } from '@/lib/ariadne-v2/embed-video-browser'
 
 type Stage = 'idle' | 'tracing' | 'done' | 'error'
 
@@ -24,6 +25,8 @@ export function TracePageClient() {
   const [recipient, setRecipient] = useState('')
   const [stage, setStage] = useState<Stage>('idle')
   const [activeMethod, setActiveMethod] = useState<'v1' | 'v2' | null>(null)
+  const [progress, setProgress] = useState(0)
+  const [progressLabel, setProgressLabel] = useState('')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
   const [downloadName, setDownloadName] = useState<string>('traced.mp4')
@@ -71,48 +74,114 @@ export function TracePageClient() {
     if (dropped) handleSelectFile(dropped)
   }, [])
 
-  const runTrace = useCallback(async (endpoint: string, method: 'v1' | 'v2') => {
-    if (!file || !recipient.trim()) return
+  const triggerDownload = (url: string, fname: string) => {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fname
+    a.click()
+  }
+
+  const resetState = () => {
     setErrorMsg(null)
     setDownloadUrl(null)
     setPayloadId(null)
-    setActiveMethod(method)
-    setStage('tracing')
+    setProgress(0)
+    setProgressLabel('')
+  }
 
+  /** v1: server-side append marker via /api/trace/embed-direct */
+  const onTraceV1 = useCallback(async () => {
+    if (!file || !recipient.trim()) return
+    resetState()
+    setActiveMethod('v1')
+    setStage('tracing')
+    setProgressLabel('Embedding v1 marker…')
+    setProgress(30)
     try {
       const form = new FormData()
       form.append('file', file)
       form.append('recipientLabel', recipient.trim())
-
-      const res = await fetch(endpoint, { method: 'POST', credentials: 'include', body: form })
-
+      const res = await fetch('/api/trace/embed-direct', { method: 'POST', credentials: 'include', body: form })
       if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as { error?: string }
-        throw new Error(err.error ?? `Trace failed (${res.status})`)
+        const e = await res.json().catch(() => ({})) as { error?: string }
+        throw new Error(e.error ?? `Trace failed (${res.status})`)
       }
-
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const pid = res.headers.get('X-Payload-Id') ?? ''
-      const fname =
-        res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1]
-        ?? `traced_${Date.now()}.${method === 'v2' ? 'png' : 'mp4'}`
-
-      setDownloadUrl(url)
-      setDownloadName(fname)
-      setPayloadId(pid)
-      setStage('done')
-
-      const a = document.createElement('a')
-      a.href = url
-      a.download = fname
-      a.click()
+      const fname = res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] ?? `traced_${Date.now()}.mp4`
+      setDownloadUrl(url); setDownloadName(fname); setPayloadId(pid); setStage('done')
+      triggerDownload(url, fname)
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : 'Trace failed')
-      setStage('error')
-      setActiveMethod(null)
+      setStage('error'); setActiveMethod(null)
     }
   }, [file, recipient])
+
+  /** v2 images: server-side via /api/trace/embed-v2-local */
+  /** v2 video: browser-side Canvas + MediaRecorder watermarking */
+  const onTraceV2 = useCallback(async () => {
+    if (!file || !recipient.trim()) return
+    resetState()
+    setActiveMethod('v2')
+    setStage('tracing')
+
+    try {
+      if (isImage) {
+        // Image: server-side LSB embed
+        setProgressLabel('Embedding v2 watermark…')
+        setProgress(30)
+        const form = new FormData()
+        form.append('file', file)
+        form.append('recipientLabel', recipient.trim())
+        const res = await fetch('/api/trace/embed-v2-local', { method: 'POST', credentials: 'include', body: form })
+        if (!res.ok) {
+          const e = await res.json().catch(() => ({})) as { error?: string }
+          throw new Error(e.error ?? `v2 embed failed (${res.status})`)
+        }
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const pid = res.headers.get('X-Payload-Id') ?? ''
+        const fname = res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] ?? `traced_v2_${Date.now()}.png`
+        setDownloadUrl(url); setDownloadName(fname); setPayloadId(pid); setStage('done')
+        triggerDownload(url, fname)
+      } else {
+        // Video: browser-side Canvas + MediaRecorder
+        setProgressLabel('Loading video…')
+        setProgress(5)
+
+        // Get a payloadId from the server first so we can register the trace
+        const mintRes = await fetch('/api/trace/mint-payload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ recipientLabel: recipient.trim() }),
+        })
+        const { payloadId: pid, error: mintErr } = (await mintRes.json().catch(() => ({}))) as { payloadId?: string; error?: string }
+        if (!mintRes.ok || !pid) throw new Error(mintErr ?? 'Could not mint payload')
+
+        setProgressLabel('Processing frames…')
+        const watermarked = await watermarkVideoInBrowser(file, pid, (p) => {
+          setProgress(p.percent)
+          setProgressLabel(
+            p.stage === 'loading' ? 'Loading video…'
+            : p.stage === 'processing' ? `Watermarking frames… ${p.percent}%`
+            : p.stage === 'encoding' ? 'Encoding…'
+            : 'Done'
+          )
+        })
+
+        const url = URL.createObjectURL(watermarked)
+        const slug = recipient.trim().replace(/[^\w.-]+/g, '_').slice(0, 40)
+        const fname = `${slug}_${pid.slice(0, 8)}_v2.webm`
+        setDownloadUrl(url); setDownloadName(fname); setPayloadId(pid); setStage('done')
+        triggerDownload(url, fname)
+      }
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : 'v2 trace failed')
+      setStage('error'); setActiveMethod(null)
+    }
+  }, [file, recipient, isImage])
 
   const reset = () => {
     if (downloadUrl?.startsWith('blob:')) URL.revokeObjectURL(downloadUrl)
@@ -252,22 +321,34 @@ export function TracePageClient() {
             </p>
           )}
 
+          {/* Progress */}
+          {busy && (
+            <div className="space-y-1">
+              <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{progressLabel}</p>
+              <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ background: 'var(--border)' }}>
+                <div
+                  className="h-full rounded-full transition-all duration-300"
+                  style={{ width: `${progress}%`, background: 'var(--primary)' }}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Action cards */}
           {stage !== 'done' && (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 
-              {/* Option 1 — v1 append marker */}
+              {/* Option 1 — v1 */}
               <div className="rounded-xl border p-5 space-y-3 flex flex-col" style={{ borderColor: 'var(--border)', background: 'var(--card)' }}>
                 <div>
-                  <p className="font-semibold text-sm">⬇️ v1 — Download to PC</p>
+                  <p className="font-semibold text-sm">⬇️ v1 — Append marker</p>
                   <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
-                    Append marker after EOF. Works on video &amp; images.
-                    Survives direct shares &amp; most re-uploads. No Creatix needed.
+                    Post-EOF bytes. Instant. Works for video &amp; images. Does not survive screenshots.
                   </p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => void runTrace('/api/trace/embed-direct', 'v1')}
+                  onClick={() => void onTraceV1()}
                   disabled={!canTrace}
                   className="mt-auto w-full rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-40 transition-opacity"
                   style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
@@ -279,28 +360,24 @@ export function TracePageClient() {
               {/* Option 2 — v2 frame watermark */}
               <div
                 className="rounded-xl border p-5 space-y-3 flex flex-col"
-                style={{
-                  borderColor: isImage ? 'var(--primary)' : 'var(--border)',
-                  background: 'var(--card)',
-                  opacity: isImage ? 1 : 0.5,
-                }}
+                style={{ borderColor: 'var(--primary)', background: 'var(--card)' }}
               >
                 <div>
                   <p className="font-semibold text-sm">🔬 v2 — Frame watermark</p>
                   <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
                     {isImage
-                      ? 'LSB pixel watermark embedded locally via sharp. Survives screenshots & re-saves. Drop the result into /detect to test the full loop.'
-                      : 'Drop an image (PNG/JPEG/WebP) to use local v2 embed. Video v2 requires Creatix (coming soon).'}
+                      ? 'LSB pixel embed via server (sharp). Screenshot → /detect round-trip works.'
+                      : 'Browser Canvas + MediaRecorder. No server, no Creatix. Output is WebM — screenshot any frame and drop into /detect.'}
                   </p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => void runTrace('/api/trace/embed-v2-local', 'v2')}
-                  disabled={!canTrace || !isImage}
+                  onClick={() => void onTraceV2()}
+                  disabled={!canTrace}
                   className="mt-auto w-full rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-40 transition-opacity"
-                  style={{ background: isImage ? 'var(--primary)' : 'var(--muted)', color: isImage ? 'var(--primary-foreground)' : 'var(--muted-foreground)' }}
+                  style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
                 >
-                  {busy && activeMethod === 'v2' ? 'Embedding…' : isImage ? 'Trace & Download (v2)' : 'Image required for v2'}
+                  {busy && activeMethod === 'v2' ? (progressLabel || 'Processing…') : 'Trace & Download (v2)'}
                 </button>
               </div>
             </div>
