@@ -50,7 +50,15 @@ export function OpenReelVoiceOverlay() {
   }
 
   return (
-    <div style={{ position: 'fixed', bottom: 80, right: 24, zIndex: 200 }}>
+    <div
+      style={{
+        position: 'fixed',
+        bottom: 220,   // above the OpenReel timeline + transport bar (~200px)
+        right: 24,
+        zIndex: 9999,  // above all OpenReel layers
+      }}
+      title={isListening ? 'Stop voice command' : 'Start voice command (say "split at 5 seconds", "set crop to 9:16", etc.)'}
+    >
       <VoiceMicButton
         isListening={isListening}
         isProcessing={isProcessing}
