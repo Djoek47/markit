@@ -280,9 +280,10 @@ export function TracePageClient() {
         </label>
 
         <p className="mb-5 rounded-md border border-[var(--border)] bg-black/20 px-3 py-2 text-[11px] leading-snug text-[var(--muted-foreground)]">
-          <span className="font-mono-ui uppercase tracking-[0.18em] text-[var(--circe-light)]">v1 caveat —</span>{' '}
-          survives direct file shares and most platform re-uploads. Does <strong>not</strong> survive re-encoding or
-          screenshots. v2 (re-encode-survival) is in development.
+          <span className="font-mono-ui uppercase tracking-[0.18em] text-[var(--circe-light)]">v1 trace —</span>{' '}
+          Append marker embedded after EOF. Survives direct file shares and most platform re-uploads.
+          Does <strong>not</strong> survive re-encoding or screenshots.{' '}
+          <span style={{ color: 'var(--primary)' }}>v2 frame watermark</span> (survives re-encoding &amp; screenshots) is available via the editor export flow.
         </p>
 
         <button

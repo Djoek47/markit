@@ -10,6 +10,7 @@ type DetectVerdict =
   | { kind: 'no_marker' }
   | { kind: 'invalid'; reason: string }
   | { kind: 'expired' }
+  | { kind: 'v2_candidate'; payload_id: string; confidence: number; source: string }
 
 type DetectResponse = {
   ok: true
@@ -19,7 +20,9 @@ type DetectResponse = {
 
 type Stage = 'idle' | 'analyzing' | 'done' | 'error'
 
-const ACCEPTED_MIME = 'video/mp4,video/quicktime,video/webm,video/x-matroska'
+const ACCEPTED_MIME = 'video/mp4,video/quicktime,video/webm,video/x-matroska,image/jpeg,image/png,image/webp'
+
+const IMAGE_MIMES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
 const MAX_BYTES = 1024 * 1024 * 1024 // 1 GB
 
 function fmtBytes(n: number): string {
@@ -173,21 +176,21 @@ export function DetectPageClient() {
         style={{ borderColor: file ? 'var(--primary)' : 'var(--border)', background: file ? 'color-mix(in oklch, var(--primary) 6%, transparent)' : 'var(--card)' }}
         onClick={() => inputRef.current?.click()}
       >
-        <div className="text-4xl">📹</div>
+        <div className="text-4xl">{file && IMAGE_MIMES.has(file.type) ? '🖼️' : '📹'}</div>
         {file ? (
           <div>
             <p className="font-mono-ui text-sm font-semibold" style={{ color: 'var(--primary)' }}>
               {file.name}
             </p>
             <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
-              {fmtBytes(file.size)}
+              {fmtBytes(file.size)} · {IMAGE_MIMES.has(file.type) ? 'Screenshot (v2 detection)' : 'Video (v1 detection)'}
             </p>
           </div>
         ) : (
           <>
-            <p className="text-sm font-semibold">Click or drag a video file here</p>
+            <p className="text-sm font-semibold">Click or drag a file here</p>
             <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-              MP4, MOV, WebM, or Matroska (up to 1 GB)
+              Video: MP4, MOV, WebM, Matroska (v1 marker) · Screenshot: PNG, JPEG, WebP (v2 frame watermark)
             </p>
           </>
         )}
@@ -212,14 +215,9 @@ export function DetectPageClient() {
         <div className="space-y-4 rounded-lg p-6" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
           {result.verdict.kind === 'identified' ? (
             <>
-              <p className="text-sm font-medium" style={{ color: 'var(--muted-foreground)' }}>
-                Result
-              </p>
+              <p className="text-sm font-medium" style={{ color: 'var(--muted-foreground)' }}>Result</p>
               <div className="flex flex-wrap items-center gap-3">
-                <div
-                  className="rounded-full px-4 py-2 text-sm font-semibold"
-                  style={{ backgroundColor: 'var(--primary)', color: '#000' }}
-                >
+                <div className="rounded-full px-4 py-2 text-sm font-semibold" style={{ backgroundColor: 'var(--primary)', color: '#000' }}>
                   {result.verdict.recipientLabel}
                 </div>
                 <div className="font-mono-ui text-xs" style={{ color: 'var(--muted-foreground)' }}>
@@ -229,6 +227,26 @@ export function DetectPageClient() {
                   Algorithm: {result.verdict.algorithmVersion}
                 </div>
               </div>
+            </>
+          ) : result.verdict.kind === 'v2_candidate' ? (
+            <>
+              <p className="text-sm font-medium" style={{ color: 'var(--muted-foreground)' }}>
+                v2 Watermark Detected
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="rounded-full px-4 py-2 text-sm font-semibold" style={{ backgroundColor: 'var(--primary)', color: '#000' }}>
+                  {(result.verdict.confidence * 100).toFixed(1)}% confidence
+                </div>
+                <div className="font-mono-ui text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                  Payload: {result.verdict.payload_id.slice(0, 16)}…
+                </div>
+                <div className="font-mono-ui text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                  Source: {result.verdict.source}
+                </div>
+              </div>
+              <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                Frame watermark found. Match this payload ID against your trace records to identify the recipient.
+              </p>
             </>
           ) : (
             <p style={{ color: 'var(--muted-foreground)' }}>{result.line}</p>
@@ -269,10 +287,14 @@ export function DetectPageClient() {
       </div>
 
       {/* Caveat */}
-      <div className="rounded-lg p-4" style={{ background: 'var(--card-2)', border: '1px solid var(--border-soft)' }}>
+      <div className="rounded-lg p-4 space-y-2" style={{ background: 'var(--card-2)', border: '1px solid var(--border-soft)' }}>
         <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-          Append-v1 markers survive direct file shares and most platform re-uploads (MP4 → MP4 with no
-          re-encode), but do not survive re-encoding, format conversion, or significant edits.
+          <span className="font-semibold" style={{ color: 'var(--foreground)' }}>v1 (video):</span>{' '}
+          Append marker — survives direct file shares and most platform re-uploads. Does not survive re-encoding or screenshots.
+        </p>
+        <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+          <span className="font-semibold" style={{ color: 'var(--primary)' }}>v2 (screenshot):</span>{' '}
+          Frame-level watermark — detects Ariadne v2 traces directly from PNG/JPEG screenshots. Survives re-encoding and platform re-upload.
         </p>
       </div>
       </div>
