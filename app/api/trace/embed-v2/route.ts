@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  let body: { uploadId?: string; recipientLabel?: string; sourceExt?: string }
+  let body: { uploadId?: string; sourcePath?: string; recipientLabel?: string; sourceExt?: string }
   try {
     body = (await req.json()) as typeof body
   } catch {
@@ -75,7 +75,15 @@ export async function POST(req: NextRequest) {
   const service = createServiceClient(supabaseUrl, serviceKey)
 
   const ext = safeExtension(body.sourceExt)
-  const sourcePath = uploadObjectPath(user.id, uploadId, ext)
+  let sourcePath: string
+  if (body.sourcePath && typeof body.sourcePath === 'string') {
+    if (!body.sourcePath.startsWith(`${user.id}/`)) {
+      return NextResponse.json({ error: 'Forbidden', code: 'path_mismatch' }, { status: 403 })
+    }
+    sourcePath = body.sourcePath
+  } else {
+    sourcePath = uploadObjectPath(user.id, uploadId, ext)
+  }
 
   // Create a presigned download URL so Creatix can fetch the source file
   const { data: srcUrl, error: srcUrlErr } = await service.storage

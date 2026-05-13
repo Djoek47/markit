@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  let body: { uploadId?: string; recipientLabel?: string; sourceExt?: string }
+  let body: { uploadId?: string; sourcePath?: string; recipientLabel?: string; sourceExt?: string }
   try {
     body = (await req.json()) as typeof body
   } catch {
@@ -63,9 +63,21 @@ export async function POST(req: NextRequest) {
   }
   const service = createServiceClient(url, serviceKey)
 
-  // 1. Locate the source file. We don't know the extension up front — try a couple defaults.
+  // 1. Resolve the source path.
+  // Prefer the exact sourcePath returned by sign-upload (avoids reconstruction mismatch).
+  // Fall back to reconstructing from uploadId + sourceExt for backwards compatibility.
+  // Either way, validate the path belongs to this user.
   const ext = safeExtension(body.sourceExt)
-  const sourcePath = uploadObjectPath(user.id, uploadId, ext)
+  let sourcePath: string
+  if (body.sourcePath && typeof body.sourcePath === 'string') {
+    // Validate ownership: path must start with this user's ID
+    if (!body.sourcePath.startsWith(`${user.id}/`)) {
+      return NextResponse.json({ error: 'Forbidden', code: 'path_mismatch' }, { status: 403 })
+    }
+    sourcePath = body.sourcePath
+  } else {
+    sourcePath = uploadObjectPath(user.id, uploadId, ext)
+  }
 
   // 2. Download source. Storage HEAD-then-download in one shot.
   const dl = await service.storage.from(TRACE_UPLOADS_BUCKET).download(sourcePath)

@@ -127,9 +127,13 @@ export function TracePageClient() {
       if (uploadResult.error) {
         throw new Error(`Upload failed: ${uploadResult.error.message}`)
       }
+      if (!uploadResult.data?.path) {
+        throw new Error('Upload completed but storage returned no path — please retry.')
+      }
       setProgress(60)
 
       // 3. Run server-side embed → traced output + signed download URL.
+      // Pass sourcePath directly — avoids server-side path reconstruction mismatch.
       setStage('embedding')
       const embedRes = await fetch('/api/trace/embed', {
         method: 'POST',
@@ -137,6 +141,7 @@ export function TracePageClient() {
         credentials: 'include',
         body: JSON.stringify({
           uploadId: signData.uploadId,
+          sourcePath: signData.sourcePath,
           recipientLabel: recipient.trim(),
           sourceExt: extFromName(file.name),
         }),
