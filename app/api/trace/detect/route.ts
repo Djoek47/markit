@@ -5,6 +5,7 @@ import { createRouteHandlerClient } from '@/lib/supabase/route-handler'
 import { extractAppendV1 } from '@/lib/trace/append-v1'
 import { buildDetectVerdict, formatVerdictLine } from '@/lib/trace/detect-interpret'
 import { TRACE_MAX_SOURCE_BYTES } from '@/lib/trace/storage'
+import { detectV2FromImage } from '@/lib/ariadne-v2/detect-v2'
 
 export const runtime = 'nodejs'
 
@@ -28,8 +29,9 @@ function buildAriadneAuthHeader(body: string): string {
  * Two paths:
  *
  * IMAGE (PNG/JPEG/WebP — e.g. a screenshot):
- *   Forwards to Creatix /api/ariadne/detect-v2 which runs frame-level
- *   watermark detection. Returns attributed recipient if v2 trace was embedded.
+ *   Runs local Ariadne v2 frame-level detection (no Creatix dependency).
+ *   sharp decodes compressed pixels → LCG+LSB+majority-vote+parity algorithm.
+ *   Returns attributed payload_id if v2 watermark was embedded.
  *
  * VIDEO:
  *   Runs local append-v1 extraction (post-EOF bytes). Fast, no Creatix call.
@@ -68,42 +70,35 @@ export async function POST(req: NextRequest) {
 
   const creatixUrl = process.env.NEXT_PUBLIC_CREATIX_APP_URL ?? ''
 
-  // ── IMAGE PATH: screenshot → Creatix frame-level detect ──────────────────────
+  // ── IMAGE PATH: screenshot → local Ariadne v2 frame-level detect ────────────
+  // Uses ported algorithm (LCG + LSB + majority vote + parity decode) — no Creatix dependency.
+  // sharp decodes compressed PNG/JPEG/WebP to raw grayscale pixels before detection.
   if (isImageMime(file.type)) {
-    if (!creatixUrl) {
-      return NextResponse.json(
-        { ok: true, verdict: { kind: 'no_marker' }, line: 'No Ariadne marker found in this file.' },
-        { status: 200 },
-      )
-    }
-
     try {
-      const fwd = new FormData()
-      fwd.append('file', file)
-      const bodyStr = '' // FormData — auth header uses empty string for sig
-      const creatixRes = await fetch(`${creatixUrl}/api/ariadne/detect-v2`, {
-        method: 'POST',
-        headers: { Authorization: buildAriadneAuthHeader(bodyStr) },
-        body: fwd,
-      })
+      const imageBuffer = Buffer.from(await file.arrayBuffer())
+      const result = await detectV2FromImage(imageBuffer)
 
-      if (!creatixRes.ok) {
-        const errBody = await creatixRes.json().catch(() => ({})) as { error?: string }
-        return NextResponse.json(
-          { error: errBody.error ?? `Creatix detect-v2 failed (${creatixRes.status})` },
-          { status: 502 },
-        )
+      // Map to a verdict shape consistent with what the UI expects
+      if (result.match_state === 'none' || !result.payload_candidates.length) {
+        return NextResponse.json({
+          ok: true,
+          verdict: { kind: 'no_marker' },
+          line: 'No Ariadne v2 watermark detected in this image.',
+        })
       }
 
-      const result = await creatixRes.json() as {
-        verdict?: { kind: string; recipientLabel?: string; confidence?: number }
-        line?: string
+      const best = result.payload_candidates[0]!
+      const verdict = {
+        kind: 'v2_candidate' as const,
+        payload_id: best.payload_id,
+        confidence: best.confidence,
+        source: best.source,
       }
-
-      return NextResponse.json({ ok: true, ...result })
+      const line = `Ariadne v2 watermark detected (confidence ${(best.confidence * 100).toFixed(1)}%). Payload: ${best.payload_id}`
+      return NextResponse.json({ ok: true, verdict, line, detect_v2: result })
     } catch (e) {
       console.error('[trace/detect] image path error:', (e as Error).message)
-      return NextResponse.json({ error: 'Detection failed' }, { status: 502 })
+      return NextResponse.json({ error: 'Image detection failed' }, { status: 500 })
     }
   }
 
