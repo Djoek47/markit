@@ -332,10 +332,18 @@ function CreatixBridge() {
           ) : (
             <p className="mt-1.5 text-[10px] text-white/30">No trace — export without marker</p>
           )}
-          <p className="mt-2 text-[9px] leading-relaxed text-white/30">
-            v1 trace survives direct file shares and most platform re-uploads.
-            Does not survive re-encoding or screenshots.
-          </p>
+          {/* Caveat copy — v2 when enabled, v1 otherwise */}
+          {process.env.NEXT_PUBLIC_ARIADNE_V2 === '1' ? (
+            <p className="mt-2 text-[9px] leading-relaxed text-primary/70">
+              ✦ v2 trace embedded directly in video frames. Survives re-encoding,
+              platform re-upload, and screenshots.
+            </p>
+          ) : (
+            <p className="mt-2 text-[9px] leading-relaxed text-white/30">
+              v1 trace survives direct file shares and most platform re-uploads.
+              Does not survive re-encoding or screenshots.
+            </p>
+          )}
         </div>
       ) : null}
 
