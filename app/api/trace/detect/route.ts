@@ -94,6 +94,8 @@ export async function POST(req: NextRequest) {
         const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
         if (url && serviceKey) {
           const service = createServiceClient(url, serviceKey)
+
+          // First: check current user's own records
           const { data: row } = await service
             .schema('markit')
             .from('trace_exports')
@@ -113,6 +115,30 @@ export async function POST(req: NextRequest) {
               ok: true,
               verdict,
               line: `Traced to ${row.recipient_label} (frame watermark, ${(best.confidence * 100).toFixed(1)}% confidence)`,
+            })
+          }
+
+          // Second: cross-account lookup — payload may belong to a different user's trace
+          // Returns recipient_label only (no user identity exposed)
+          const { data: crossRow } = await service
+            .schema('markit')
+            .from('trace_exports')
+            .select('recipient_label, algorithm')
+            .eq('payload_id', best.payload_id)
+            .maybeSingle()
+
+          if (crossRow) {
+            const verdict = {
+              kind: 'v2_candidate' as const,
+              payload_id: best.payload_id,
+              confidence: best.confidence,
+              source: best.source,
+              recipient_hint: crossRow.recipient_label as string,
+            }
+            return NextResponse.json({
+              ok: true,
+              verdict,
+              line: `Frame watermark matched recipient "${crossRow.recipient_label}" (${(best.confidence * 100).toFixed(1)}% confidence) — traced by a different account.`,
             })
           }
         }

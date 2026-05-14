@@ -10,7 +10,7 @@ type DetectVerdict =
   | { kind: 'no_marker' }
   | { kind: 'invalid'; reason: string }
   | { kind: 'expired' }
-  | { kind: 'v2_candidate'; payload_id: string; confidence: number; source: string }
+  | { kind: 'v2_candidate'; payload_id: string; confidence: number; source: string; recipient_hint?: string }
 
 type DetectResponse = {
   ok: true
@@ -231,9 +231,14 @@ export function DetectPageClient() {
           ) : result.verdict.kind === 'v2_candidate' ? (
             <>
               <p className="text-sm font-medium" style={{ color: 'var(--muted-foreground)' }}>
-                v2 Watermark Detected — Not in Your Records
+                {result.verdict.recipient_hint ? 'v2 Watermark Detected' : 'v2 Watermark Detected — Not in Your Records'}
               </p>
               <div className="flex flex-wrap items-center gap-3">
+                {result.verdict.recipient_hint && (
+                  <div className="rounded-full px-4 py-2 text-sm font-semibold" style={{ backgroundColor: 'color-mix(in oklch, var(--primary) 60%, transparent)', color: 'var(--foreground)' }}>
+                    {result.verdict.recipient_hint}
+                  </div>
+                )}
                 <div className="rounded-full px-4 py-2 text-sm font-semibold" style={{ backgroundColor: 'color-mix(in oklch, var(--primary) 40%, transparent)', color: 'var(--foreground)' }}>
                   {(result.verdict.confidence * 100).toFixed(1)}% confidence
                 </div>
@@ -242,8 +247,9 @@ export function DetectPageClient() {
                 </div>
               </div>
               <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                Frame watermark found but this payload isn&apos;t in your trace records.
-                It may belong to a different account or was traced outside Markit.
+                {result.verdict.recipient_hint
+                  ? `Recipient "${result.verdict.recipient_hint}" found — traced by a different account.`
+                  : 'Frame watermark found but this payload isn\'t in any trace records. May have been traced outside Markit.'}
               </p>
             </>
           ) : (
